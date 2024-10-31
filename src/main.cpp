@@ -20,6 +20,7 @@
 #define DEBUG_SERIAL          if (DEBUG) Serial
 
 // LCD configuration
+#define ANIM_FRAME_COUNT      8
 #define LCD_COLUMNS           16
 #define LCD_ROWS              2
 #define LCD_ADDRESS           0x27
@@ -29,6 +30,84 @@
 
 // General configuration
 #define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
+
+// The custom chars that make up the various animation frames.
+const byte animationCustomChars[][8] =
+{
+  {
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B
+  },
+  {
+    0x18,
+    0x18,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B
+  },
+  {
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x18,
+    0x18,
+    0x1B,
+    0x1B
+  },
+  {
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x03,
+    0x03,
+    0x1B,
+    0x1B
+  },
+  {
+    0x03,
+    0x03,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B,
+    0x1B
+  },
+  {
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00
+  }
+};
+
+// The characters that a single column must progress through in completion for one cycle of the animation. First digit is charater for upper row, second digit is for lower row.
+const int animationSequence[ANIM_FRAME_COUNT][LCD_ROWS] =
+{
+  { 5, 3 },
+  { 5, 4 },
+  { 3, 0 },
+  { 4, 0 },
+  { 1, 0 },
+  { 2, 0 },
+  { 5, 1 },
+  { 5, 2 },
+};
 
 // Global vars
 hd44780_I2Cexp lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
@@ -73,8 +152,15 @@ void loop() {
 
 void InitializeLCD() {
   DEBUG_SERIAL.println("Initializing LCD");
+  
   lcd.init();
   lcd.backlight();
+  
+  // Import the custom chars into the LCD config.
+  for (int i = 0; i < LEN(animationCustomChars); i++) {
+    lcd.createChar(i, animationCustomChars[i]);
+  }
+  
   DEBUG_SERIAL.println("LCD initialized!");
 }
 
@@ -185,8 +271,6 @@ void UpdateValueFromAPI() {
 }
 
 void WriteToLCD(String topRow, String bottomRow, bool animate) {
-  lcd.clear();
-
   if (animate) {
     PerformLCDAnimation();
   }
@@ -199,19 +283,27 @@ void WriteToLCD(String topRow, String bottomRow, bool animate) {
 }
 
 void PerformLCDAnimation() {
-  for (int i = 0; i < LCD_COLUMNS; i++) {
-    lcd.setCursor(i, 0);
-    lcd.print(0);
-    lcd.setCursor(i, 1);
-    lcd.print(0);
-    delay(50);
+  lcd.clear();
+  for (int i = 0; i < 3; i++) {                               // Loop the animation three times.
+    for (int frame = 0; frame < ANIM_FRAME_COUNT; frame++) {  // For each frame in the animation...
+      for (int column = 0; column < LCD_COLUMNS; column++) {  // For each column in the display...
+        int frameIndex = column;                              // Start with the column index, this means for a frame array containing ['\', '_', '/'] the first three columns will show \_/.
+        while (frameIndex >= ANIM_FRAME_COUNT) {              // There may be more columns than animation frames, if so pull it back to within the bounds of the animation frame array.
+          frameIndex -= ANIM_FRAME_COUNT;                     // For a 16 column display, the frame index will now be 0,1,2,3,4,5,6,7,0,1,2,3,4,5,6,7 for each of the 16 columns respectively.
+        }
+        frameIndex -= frame;                                  // Shift the frame index left by the number of frames already passed in the animation.
+                                                              // For frame 0: Col 3 has frameIndex 3, Col 4 has frameIndex 4 etc. For frame 1: Col 3 has frameIndex 2, Col 4 has frameIndex 3 etc.
+                                                              // This means for each frame in the animation, the char displayed on a column is the one previously displayed on the column to its left, creating the illusion of rightwards movement.
+        if (frameIndex < 0) {                                 // If left shifted earlier than the first frame, wrap back around to the last frame. In previous example in frame 2, Col 1 has frameIndex -1 which is wrapped around to frameIndex 7.
+          frameIndex += 8;
+        }
+        for (int row = 0; row < LCD_ROWS; row ++) {           // Draw the correct character in the upper and lower rows for that column.
+          lcd.setCursor(column, row);
+          lcd.write(animationSequence[frameIndex][row]);
+        }
+    }
+    delay(100);
+    }
   }
-
-  for (int i = LCD_COLUMNS - 1; i >= 0; i--) {
-    lcd.setCursor(i, 0);
-    lcd.print(" ");
-    lcd.setCursor(i, 1);
-    lcd.print(" ");
-    delay(50);
-  }
+  lcd.clear();
 }
