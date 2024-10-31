@@ -1,12 +1,20 @@
 #include <Arduino.h>
+#include <WiFiManager.h>
+#include <ESPmDNS.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-#include <LiquidCrystal_I2C.h>
+
+#include <Wire.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_I2Cexp.h>
+
+#include <elapsedMillis.h>
+
 #include "secrets.h"
 
 // Debugging configuration
-#define DEBUG                 false             // Optional printing of debug messages to serial
+#define DEBUG                 true              // Optional printing of debug messages to serial
 #define DEBUG_SERIAL          if (DEBUG) Serial
 
 // LCD configuration
@@ -14,42 +22,33 @@
 #define LCD_ROWS              2
 #define LCD_ADDRESS           0x27
 
+// WiFi configuration
+#define WIFI_CONN_TIMEOUT     10
+
 // General configuration
-#define POLL_INTERVAL_SECONDS 10
+#define POLL_INTERVAL_SECONDS 30
 
 // Global vars
-LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+hd44780_I2Cexp lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 String currentValue;
 bool currentValueUpdated;
 
 // Function declarations
-bool ValidateWiFiConnection();
+bool IsWiFiConnected();
+void InitializeLCD();
+void InitializeWiFi();
 void UpdateValueFromAPI();
 void WriteToLCD(String, String = "");
 
 void setup() {
   DEBUG_SERIAL.begin(9600);
 
-  DEBUG_SERIAL.print("Initializing LCD");
-  lcd.init();
-  lcd.backlight();
-  DEBUG_SERIAL.print("LCD initialized!");
-
-  DEBUG_SERIAL.print("Initializing WiFi");
-  DEBUG_SERIAL.print("Connecting");
-  WriteToLCD("WiFi connecting", SECRET_WIFI_SSID);
-  WiFi.begin(SECRET_WIFI_SSID, SECRET_WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    DEBUG_SERIAL.print(".");
-  }
-  DEBUG_SERIAL.println();
-  DEBUG_SERIAL.println("WiFi connected!");
-  WriteToLCD("WiFi connected!");
+  InitializeLCD();
+  InitializeWiFi();
 }
 
 void loop() {
-  if (ValidateWiFiConnection()) {
+  if (IsWiFiConnected()) {
     UpdateValueFromAPI();
 
     if (currentValue == "Unknown") {
@@ -69,8 +68,63 @@ void loop() {
   delay(POLL_INTERVAL_SECONDS * 1000);
 }
 
-bool ValidateWiFiConnection() {
+void InitializeLCD() {
+  DEBUG_SERIAL.println("Initializing LCD");
+  lcd.init();
+  lcd.backlight();
+  DEBUG_SERIAL.println("LCD initialized!");
+}
+
+bool IsWiFiConnected() {
   return (WiFi.status() == WL_CONNECTED);
+}
+
+void InitializeWiFi() {
+  DEBUG_SERIAL.println("Initializing WiFi");
+  WiFi.mode(WIFI_STA);
+  WiFi.reconnect();
+
+  // Attempt connection using stored WiFi configuration
+  elapsedMillis autoConnectMillis = 0;
+  while (autoConnectMillis < WIFI_CONN_TIMEOUT * 1000) {
+    if (WiFi.status() == WL_CONNECTED) {
+      DEBUG_SERIAL.println("WiFi connected!");
+      WriteToLCD("WiFi connected!");
+      return;
+    }
+    delay(100);
+  }
+
+  // WiFi auto-connection wasn't successful. Spin up portal for config.
+  DEBUG_SERIAL.println("WiFi connection failed");
+  WriteToLCD("Automatic WiFi", "reconnect failed");
+  delay(3000);
+
+  DEBUG_SERIAL.println("Invoking WiFi configuration portal.");
+  WriteToLCD("Generating WiFi", "config portal");
+  delay(3000);
+
+  WiFiManager wifiManager;
+  wifiManager.setConfigPortalBlocking(false);
+  wifiManager.autoConnect("ESP-CX-CTR", SECRET_WIFI_PASSWORD);
+
+  String passwordString = "Pass: ";
+  passwordString += SECRET_WIFI_PASSWORD;
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    wifiManager.process();
+
+    WriteToLCD("Connect to the", "following WiFi:");
+    WriteToLCD("Name: ESP-CX-CTR", passwordString);
+    delay(3000);
+
+    WriteToLCD("Then visit the", "following site:");
+    WriteToLCD("192.168.4.1");
+    delay(3000);
+  }
+
+  DEBUG_SERIAL.println("WiFi connected!");
+  WriteToLCD("WiFi connected!");
 }
 
 void UpdateValueFromAPI() {
@@ -100,7 +154,7 @@ void UpdateValueFromAPI() {
       DEBUG_SERIAL.println(value);
     }
     else {
-      DEBUG_SERIAL.print("Polled API and received same value as previously");
+      DEBUG_SERIAL.println("Polled API and received same value as previously");
     }
   }
   else {
