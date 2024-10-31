@@ -13,8 +13,10 @@
 
 #include "secrets.h"
 
+#define LEN(arr) ((int) (sizeof (arr) / sizeof (arr)[0]))
+
 // Debugging configuration
-#define DEBUG                 true              // Optional printing of debug messages to serial
+#define DEBUG                 true              // Optional printing of debug messages to serial.
 #define DEBUG_SERIAL          if (DEBUG) Serial
 
 // LCD configuration
@@ -23,10 +25,10 @@
 #define LCD_ADDRESS           0x27
 
 // WiFi configuration
-#define WIFI_RECONN_TIMEOUT   10
+#define WIFI_RECONN_TIMEOUT   10                // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
 
 // General configuration
-#define POLL_INTERVAL_SECONDS 30
+#define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
 
 // Global vars
 hd44780_I2Cexp lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
@@ -39,6 +41,7 @@ void InitializeLCD();
 void InitializeWiFi();
 void UpdateValueFromAPI();
 void WriteToLCD(String, String = "", bool = false);
+void PerformLCDAnimation();
 
 void setup() {
   DEBUG_SERIAL.begin(9600);
@@ -89,7 +92,7 @@ void InitializeWiFi() {
   WiFi.reconnect();
   elapsedMillis autoConnectMillis = 0;
   while (autoConnectMillis < WIFI_RECONN_TIMEOUT * 1000) {
-    if (WiFi.status() == WL_CONNECTED) {
+    if (IsWiFiConnected()) {
       DEBUG_SERIAL.println("WiFi connected!");
       WriteToLCD("WiFi connected!");
       return;
@@ -119,12 +122,6 @@ void InitializeWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     wifiManager.process();
 
-    // Periodically re-attempt connection to the saved WiFi... Just in case.
-    if (autoConnectMillis > WIFI_RECONN_TIMEOUT * 1000) {
-      WiFi.reconnect();
-      autoConnectMillis = 0;
-    }
-
     WriteToLCD("Connect to the", "following WiFi:");
     delay(2000);
     WriteToLCD("Name: ESP-CX-CTR", passwordString);
@@ -134,6 +131,12 @@ void InitializeWiFi() {
     delay(2000);
     WriteToLCD("URL:", "192.168.4.1");
     delay(4000);
+
+    // Periodically re-attempt connection to the saved WiFi... Just in case.
+    if (autoConnectMillis > WIFI_RECONN_TIMEOUT * 1000) {
+      WiFi.reconnect();
+      autoConnectMillis = 0;
+    }
   }
 
   DEBUG_SERIAL.println("WiFi connected!");
@@ -185,21 +188,7 @@ void WriteToLCD(String topRow, String bottomRow, bool animate) {
   lcd.clear();
 
   if (animate) {
-    for (int i = 0; i < LCD_COLUMNS; i++) {
-      lcd.setCursor(i, 0);
-      lcd.print(0);
-      lcd.setCursor(i, 1);
-      lcd.print(0);
-      delay(50);
-    }
-
-    for (int i = LCD_COLUMNS - 1; i >= 0; i--) {
-      lcd.setCursor(i, 0);
-      lcd.print(" ");
-      lcd.setCursor(i, 1);
-      lcd.print(" ");
-      delay(50);
-    }
+    PerformLCDAnimation();
   }
 
   lcd.clear();
@@ -207,4 +196,22 @@ void WriteToLCD(String topRow, String bottomRow, bool animate) {
   lcd.print(topRow);
   lcd.setCursor(0, 1);
   lcd.print(bottomRow);
+}
+
+void PerformLCDAnimation() {
+  for (int i = 0; i < LCD_COLUMNS; i++) {
+    lcd.setCursor(i, 0);
+    lcd.print(0);
+    lcd.setCursor(i, 1);
+    lcd.print(0);
+    delay(50);
+  }
+
+  for (int i = LCD_COLUMNS - 1; i >= 0; i--) {
+    lcd.setCursor(i, 0);
+    lcd.print(" ");
+    lcd.setCursor(i, 1);
+    lcd.print(" ");
+    delay(50);
+  }
 }
