@@ -1,25 +1,34 @@
+// TODO: migrate away from excessive usages of String to avoid memory fragmentation.
+// TODO: LDR display blanking.
+// TODO: LDR value selection.
+// TODO: Configuration cycling for different LDR modes.
+// TODO: Run packet analysis
+// TODO: function docs
+// TODO: char* vs char[]
+
 #include <Arduino.h>
 #include <WiFiManager.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-
 #include <Wire.h>
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
-
+#include <EEPROM.h>
 #include <elapsedMillis.h>
 
 #include "secrets.h"
 
 #pragma region PreProcessorDirectives
+
 // Helper methods
 #define LEN(arr) ((int) (sizeof (arr) / sizeof (arr)[0]))
 
 // Debugging configuration
 #define DEBUG                 true              // Optional printing of debug messages to serial.
 #define DEBUG_SERIAL          if (DEBUG) Serial
+#define EEPROM_INIT           false             // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
 
 // LCD configuration
 #define ANIM_FRAME_COUNT      8                 // The number of frames in the LCD animation sequence.
@@ -32,9 +41,12 @@
 
 // General configuration
 #define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
+#define API_VALUE_COUNT       3                 // The number of values this version of code expects from the API, values in excess will be discarded. There should be a _valueLabel entry for each of these in secrets file.
+
 #pragma endregion PreProcessorDirectives
 
 #pragma region Constants
+
 // The custom chars that make up the various animation frames.
 const byte animationCustomChars[][8] =
 {
@@ -112,24 +124,38 @@ const int animationSequence[ANIM_FRAME_COUNT][LCD_ROWS] =
   { 5, 1 },
   { 5, 2 },
 };
+
 #pragma endregion Constants
 
 #pragma region Globals
-hd44780_I2Cexp lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
-String currentValue;
-bool currentValueUpdated;
+
+hd44780_I2Cexp _lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+String _currentValue[API_VALUE_COUNT];                    // The current values available to be rendered on the display. One for each API value.
+bool _currentValueUpdated[API_VALUE_COUNT];               // Whether the latest value received from the API differs from what is currently being rendered. One for each API value.
+int _selectedValueIndex;                                  // The statistic chosen to be displayed. API returns multiple, pipe delimited ints. The one selected here is what is rendered on the display.
+
 #pragma endregion Globals
 
 #pragma region FunctionDeclarations
+
 bool IsWiFiConnected();
 void InitializeLCD();
 void InitializeWiFi();
 void UpdateValueFromAPI();
 void WriteToLCD(String, String = "", bool = false);
 void PerformLCDAnimation();
+void InitializeEEPROM();
+void SaveConfigToEEPROM();
+void LoadConfigFromEEPROM();
+
 #pragma endregion FunctionDeclarations
 
 void setup() {
+  if (EEPROM_INIT) {
+    InitializeEEPROM();
+    return;
+  }
+
   DEBUG_SERIAL.begin(9600);
 
   InitializeLCD();
@@ -140,17 +166,17 @@ void loop() {
   if (IsWiFiConnected()) {
     UpdateValueFromAPI();
 
-    if (currentValue == "Unknown") {
+    if (_currentValue[_selectedValueIndex] == "Unknown") {
       WriteToLCD("Invalid API", "response");
     }
-    else if (currentValueUpdated) {
-      WriteToLCD("Subscriber count", currentValue, true);
-      currentValueUpdated = false;
+    else if (_currentValueUpdated[_selectedValueIndex]) {
+      WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
+      _currentValueUpdated[_selectedValueIndex] = false;
     }
   }
   else {
     WriteToLCD("WiFi conn lost");
-    currentValue = "NULL";
+    _currentValue[_selectedValueIndex] = "NULL";
     InitializeWiFi();
   }
 
@@ -158,15 +184,16 @@ void loop() {
 }
 
 #pragma region FunctionDefinitions
+
 void InitializeLCD() {
   DEBUG_SERIAL.println("Initializing LCD");
   
-  lcd.init();
-  lcd.backlight();
+  _lcd.init();
+  _lcd.backlight();
   
   // Import the custom chars into the LCD config.
   for (int i = 0; i < LEN(animationCustomChars); i++) {
-    lcd.createChar(i, animationCustomChars[i]);
+    _lcd.createChar(i, animationCustomChars[i]);
   }
   
   DEBUG_SERIAL.println("LCD initialized!");
@@ -238,8 +265,8 @@ void InitializeWiFi() {
 }
 
 void UpdateValueFromAPI() {
-  lcd.setCursor(15, 1); // Little dot in bottom right section shows API being polled.
-  lcd.print(".");
+  _lcd.setCursor(15, 1); // Little dot in bottom right section shows API being polled.
+  _lcd.print(".");
 
   WiFiClientSecure client;
   HTTPClient https;
@@ -255,27 +282,48 @@ void UpdateValueFromAPI() {
   DEBUG_SERIAL.println(httpResponseCode);
 
   if (httpResponseCode > 0) {
-    String value = https.getString(); 
-    if (value != currentValue) {
-      currentValue = value;
-      currentValueUpdated = true;
+    String values = https.getString();
+    values.remove(values.indexOf('*'), 1); // Removes the * used to inform the 7-seg display which value to display. Unused on LCD units.
 
-      DEBUG_SERIAL.print("Got new value: ");
-      DEBUG_SERIAL.println(value);
-    }
-    else {
-      DEBUG_SERIAL.println("Polled API and received same value as previously");
+    for (int i = 0; i < API_VALUE_COUNT; i++) {
+      String newVal;
+      if (i < API_VALUE_COUNT - 1) { // Copy the value up unto the next pipe into the array, then delete up to and including the pipe.
+        int pipeIndex = values.indexOf('|');
+        newVal = values.substring(0, pipeIndex);
+        values.remove(0, pipeIndex + 1);
+      } else { // Last value is treated differently as it has no closing pipe.
+        values.trim();
+        newVal = values;
+      }
+
+      if (newVal != _currentValue[i]) {
+        _currentValue[i] = newVal;
+        _currentValueUpdated[i] = true;
+
+        DEBUG_SERIAL.print("Got new value: ");
+        DEBUG_SERIAL.print(newVal);
+        DEBUG_SERIAL.print(" for index ");
+        DEBUG_SERIAL.println(i);
+      }
+      else {
+        DEBUG_SERIAL.print("Polled API and received same value as previously (");
+        DEBUG_SERIAL.print(newVal);
+        DEBUG_SERIAL.print(") for index ");
+        DEBUG_SERIAL.println(i);
+      }
     }
   }
   else {
     DEBUG_SERIAL.println("Unable to contact API");
-    currentValue = "Unknown";
+    for (int i = 0; i < API_VALUE_COUNT; i++) {
+      _currentValue[i] = "Unknown";
+    }
   }
 
   https.end();
 
-  lcd.setCursor(15, 1);
-  lcd.print(" ");
+  _lcd.setCursor(15, 1);
+  _lcd.print(" ");
 }
 
 void WriteToLCD(String topRow, String bottomRow, bool animate) {
@@ -283,15 +331,15 @@ void WriteToLCD(String topRow, String bottomRow, bool animate) {
     PerformLCDAnimation();
   }
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(topRow);
-  lcd.setCursor(0, 1);
-  lcd.print(bottomRow);
+  _lcd.clear();
+  _lcd.setCursor(0, 0);
+  _lcd.print(topRow);
+  _lcd.setCursor(0, 1);
+  _lcd.print(bottomRow);
 }
 
 void PerformLCDAnimation() {
-  lcd.clear();
+  _lcd.clear();
   for (int i = 0; i < 3; i++) {                               // Loop the animation three times.
     for (int frame = 0; frame < ANIM_FRAME_COUNT; frame++) {  // For each frame in the animation...
       for (int column = 0; column < LCD_COLUMNS; column++) {  // For each column in the display...
@@ -306,13 +354,38 @@ void PerformLCDAnimation() {
           frameIndex += 8;
         }
         for (int row = 0; row < LCD_ROWS; row ++) {           // Draw the correct character in the upper and lower rows for that column.
-          lcd.setCursor(column, row);
-          lcd.write(animationSequence[frameIndex][row]);
+          _lcd.setCursor(column, row);
+          _lcd.write(animationSequence[frameIndex][row]);
         }
     }
     delay(100);
     }
   }
-  lcd.clear();
+  _lcd.clear();
 }
+
+/*
+* Pulls configuration from EEPROM on ESP startup and reads them into the global variables.
+*/
+void LoadConfigFromEEPROM() {
+  _selectedValueIndex = EEPROM.readInt(0);
+}
+
+/*
+* Saves configuration to EEPROM when config edited via bluetooth command.
+*/
+void SaveConfigToEEPROM() {
+  EEPROM.writeInt(0, _selectedValueIndex);
+}
+
+/*
+* Initializes the EEPROM, sets all addresses to 0 and then loads in default config.
+*/
+void InitializeEEPROM() {
+  for (int i = 0; i < EEPROM.length(); i++) {
+    EEPROM.write(i, 0);
+  };
+  SaveConfigToEEPROM();
+}
+
 #pragma endregion FunctionDefinitions
