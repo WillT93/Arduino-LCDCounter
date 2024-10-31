@@ -23,7 +23,7 @@
 #define LCD_ADDRESS           0x27
 
 // WiFi configuration
-#define WIFI_CONN_TIMEOUT     10
+#define WIFI_RECONN_TIMEOUT   10
 
 // General configuration
 #define POLL_INTERVAL_SECONDS 30
@@ -84,10 +84,11 @@ void InitializeWiFi() {
   WriteToLCD("WiFi connecting");
   WiFi.mode(WIFI_STA);
 
-  // Attempt connection using stored WiFi configuration
+  // Attempt connection using stored WiFi configuration.
+  // This allows us to resolve connection drops without invoking WiFiManager.
   WiFi.reconnect();
   elapsedMillis autoConnectMillis = 0;
-  while (autoConnectMillis < WIFI_CONN_TIMEOUT * 1000) {
+  while (autoConnectMillis < WIFI_RECONN_TIMEOUT * 1000) {
     if (WiFi.status() == WL_CONNECTED) {
       DEBUG_SERIAL.println("WiFi connected!");
       WriteToLCD("WiFi connected!");
@@ -105,15 +106,24 @@ void InitializeWiFi() {
   WriteToLCD("Generating WiFi", "config portal");
   delay(3000);
 
+  // Generate an instance of WiFi Manager to build the portal and handle reconnect.
   WiFiManager wifiManager;
   wifiManager.setConfigPortalBlocking(false);
-  wifiManager.autoConnect("ESP-CX-CTR", SECRET_WIFI_PASSWORD);
+  wifiManager.autoConnect("ESP-CX-CTR", SECRET_WIFI_PASSWORD); // This will actually attempt reconnection one more time. It's possible to use .startConfigPortal() but the non-blocking code is a lot more complex.
 
   String passwordString = "Pass: ";
   passwordString += SECRET_WIFI_PASSWORD;
   
+  // Non-blocking WiFi Manager instance to allow us to refresh the display while the portal is active.
+  autoConnectMillis = 0;
   while (WiFi.status() != WL_CONNECTED) {
     wifiManager.process();
+
+    // Periodically re-attempt connection to the saved WiFi... Just in case.
+    if (autoConnectMillis > WIFI_RECONN_TIMEOUT * 1000) {
+      WiFi.reconnect();
+      autoConnectMillis = 0;
+    }
 
     WriteToLCD("Connect to the", "following WiFi:");
     delay(2000);
@@ -124,8 +134,6 @@ void InitializeWiFi() {
     delay(2000);
     WriteToLCD("URL:", "192.168.4.1");
     delay(4000);
-
-    WiFi.reconnect();
   }
 
   DEBUG_SERIAL.println("WiFi connected!");
