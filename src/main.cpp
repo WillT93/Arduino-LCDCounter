@@ -38,7 +38,7 @@ bool IsWiFiConnected();
 void InitializeLCD();
 void InitializeWiFi();
 void UpdateValueFromAPI();
-void WriteToLCD(String, String = "");
+void WriteToLCD(String, String = "", bool = false);
 
 void setup() {
   DEBUG_SERIAL.begin(9600);
@@ -62,7 +62,7 @@ void loop() {
   else {
     WriteToLCD("WiFi conn lost");
     currentValue = "NULL";
-    WiFi.reconnect();
+    InitializeWiFi();
   }
 
   delay(POLL_INTERVAL_SECONDS * 1000);
@@ -81,10 +81,11 @@ bool IsWiFiConnected() {
 
 void InitializeWiFi() {
   DEBUG_SERIAL.println("Initializing WiFi");
+  WriteToLCD("WiFi connecting");
   WiFi.mode(WIFI_STA);
-  WiFi.reconnect();
 
   // Attempt connection using stored WiFi configuration
+  WiFi.reconnect();
   elapsedMillis autoConnectMillis = 0;
   while (autoConnectMillis < WIFI_CONN_TIMEOUT * 1000) {
     if (WiFi.status() == WL_CONNECTED) {
@@ -115,12 +116,16 @@ void InitializeWiFi() {
     wifiManager.process();
 
     WriteToLCD("Connect to the", "following WiFi:");
+    delay(2000);
     WriteToLCD("Name: ESP-CX-CTR", passwordString);
-    delay(3000);
+    delay(5000);
 
     WriteToLCD("Then visit the", "following site:");
-    WriteToLCD("192.168.4.1");
-    delay(3000);
+    delay(2000);
+    WriteToLCD("URL:", "192.168.4.1");
+    delay(4000);
+
+    WiFi.reconnect();
   }
 
   DEBUG_SERIAL.println("WiFi connected!");
@@ -168,23 +173,25 @@ void UpdateValueFromAPI() {
   lcd.print(" ");
 }
 
-void WriteToLCD(String topRow, String bottomRow) {
+void WriteToLCD(String topRow, String bottomRow, bool animate) {
   lcd.clear();
 
-  for (int i = 0; i < LCD_COLUMNS; i++) {
-    lcd.setCursor(i, 0);
-    lcd.print(0);
-    lcd.setCursor(i, 1);
-    lcd.print(0);
-    delay(50);
-  }
+  if (animate) {
+    for (int i = 0; i < LCD_COLUMNS; i++) {
+      lcd.setCursor(i, 0);
+      lcd.print(0);
+      lcd.setCursor(i, 1);
+      lcd.print(0);
+      delay(50);
+    }
 
-  for (int i = LCD_COLUMNS - 1; i >= 0; i--) {
-    lcd.setCursor(i, 0);
-    lcd.print(" ");
-    lcd.setCursor(i, 1);
-    lcd.print(" ");
-    delay(50);
+    for (int i = LCD_COLUMNS - 1; i >= 0; i--) {
+      lcd.setCursor(i, 0);
+      lcd.print(" ");
+      lcd.setCursor(i, 1);
+      lcd.print(" ");
+      delay(50);
+    }
   }
 
   lcd.clear();
