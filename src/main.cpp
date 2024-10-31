@@ -13,6 +13,8 @@
 
 #include "secrets.h"
 
+#pragma region PreProcessorDirectives
+// Helper methods
 #define LEN(arr) ((int) (sizeof (arr) / sizeof (arr)[0]))
 
 // Debugging configuration
@@ -20,7 +22,7 @@
 #define DEBUG_SERIAL          if (DEBUG) Serial
 
 // LCD configuration
-#define ANIM_FRAME_COUNT      8
+#define ANIM_FRAME_COUNT      8                 // The number of frames in the LCD animation sequence.
 #define LCD_COLUMNS           16
 #define LCD_ROWS              2
 #define LCD_ADDRESS           0x27
@@ -30,7 +32,9 @@
 
 // General configuration
 #define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
+#pragma endregion PreProcessorDirectives
 
+#pragma region Constants
 // The custom chars that make up the various animation frames.
 const byte animationCustomChars[][8] =
 {
@@ -108,19 +112,22 @@ const int animationSequence[ANIM_FRAME_COUNT][LCD_ROWS] =
   { 5, 1 },
   { 5, 2 },
 };
+#pragma endregion Constants
 
-// Global vars
+#pragma region Globals
 hd44780_I2Cexp lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 String currentValue;
 bool currentValueUpdated;
+#pragma endregion Globals
 
-// Function declarations
+#pragma region FunctionDeclarations
 bool IsWiFiConnected();
 void InitializeLCD();
 void InitializeWiFi();
 void UpdateValueFromAPI();
 void WriteToLCD(String, String = "", bool = false);
 void PerformLCDAnimation();
+#pragma endregion FunctionDeclarations
 
 void setup() {
   DEBUG_SERIAL.begin(9600);
@@ -137,7 +144,7 @@ void loop() {
       WriteToLCD("Invalid API", "response");
     }
     else if (currentValueUpdated) {
-      WriteToLCD("Subscriber count", currentValue);
+      WriteToLCD("Subscriber count", currentValue, true);
       currentValueUpdated = false;
     }
   }
@@ -150,6 +157,7 @@ void loop() {
   delay(POLL_INTERVAL_SECONDS * 1000);
 }
 
+#pragma region FunctionDefinitions
 void InitializeLCD() {
   DEBUG_SERIAL.println("Initializing LCD");
   
@@ -230,7 +238,7 @@ void InitializeWiFi() {
 }
 
 void UpdateValueFromAPI() {
-  lcd.setCursor(15, 1);
+  lcd.setCursor(15, 1); // Little dot in bottom right section shows API being polled.
   lcd.print(".");
 
   WiFiClientSecure client;
@@ -307,3 +315,4 @@ void PerformLCDAnimation() {
   }
   lcd.clear();
 }
+#pragma endregion FunctionDefinitions
