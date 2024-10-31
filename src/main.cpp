@@ -101,7 +101,7 @@ void InitializeWiFi() {
   WriteToLCD("Automatic WiFi", "reconnect failed");
   delay(3000);
 
-  DEBUG_SERIAL.println("Invoking WiFi configuration portal.");
+  DEBUG_SERIAL.println("Invoking WiFi configuration portal");
   WriteToLCD("Generating WiFi", "config portal");
   delay(3000);
 
