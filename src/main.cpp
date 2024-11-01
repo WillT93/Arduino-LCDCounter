@@ -2,9 +2,10 @@
 // TODO: LDR value selection.  (needs testing)
 // TODO: Configuration cycling for different LDR modes. (Needs testing)
 // TODO: Run packet analysis.
-// TODO: function docs.
 // TODO: More serial debug logs.
+// TODO: More inline comments.
 // TODO: break into smaller .cpp and .h.
+// TODO: look into warnings about array bounds
 
 #include <Arduino.h>
 #include <WiFiManager.h>
@@ -18,7 +19,13 @@
 #include <EEPROM.h>
 #include <elapsedMillis.h>
 
-#include "secrets.h"
+#include "api_t93.h"
+#include "controls_t93.h"
+#include "eeprom_t93.h"
+#include "enums_t93.h"
+#include "lcd_t93.h"
+#include "secrets_t93.h"
+#include "wifi_t93.h"
 
 #pragma region PreProcessorDirectives
 // Helper methods
@@ -33,13 +40,6 @@
 #define BTN_2_PIN             35                // The input pin the second button is connected to.
 #define LDR_PIN               32                // The input pin the LDR is connected to, must be capable of analog input reading.
 
-// LCD configuration
-#define ANIM_FRAME_COUNT      8                 // The number of frames in the LCD animation sequence.
-#define LCD_COLUMNS           16                // Number of columns in the LCD.
-#define LCD_ROWS              2                 // Number of rows in the LCD.
-#define LCD_ADDRESS           0x27              // The I2C address the LCD lives at. Can be found using an I2C scanning sketch.
-#define LDR_THRESHOLD         100               // The threshold the LDR must be below in order for it to be considered in "darkness".
-
 // WiFi / API configuration
 #define WIFI_RECONN_TIMEOUT   10                // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
 #define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
@@ -47,14 +47,6 @@
 #define RESPONSE_BUFFFER_SIZE 512               // The size of the buffer to read the API response string into. Must be at least as large as the length of the returned payload.
 #define MAX_VALUE_LENGTH      16                // The maximum length of each return value including termination character. Note we are only allowing up to 15 chars (plus termination) because we are using the 16th column for the folling indicator.
 #pragma endregion PreProcessorDirectives
-
-#pragma region Enums
-enum DisplayDimmingMode {
-  Auto = 1, // Display backlight will turn itself off when in a dark room.
-  On = 2, // Display backlight is always on.
-  Off = 3 // Display backlight is always off.
-};
-#pragma endregion Enums
 
 #pragma region Constants
 // The custom chars that make up the various animation frames.
@@ -146,25 +138,8 @@ bool _lcdBacklightOn;                                   // Whether the LCD backl
 #pragma endregion Globals
 
 #pragma region FunctionDeclarations
-void ProcessAPIPolling();
-void ProcessButtons();
-void Button1Pressed();
-void Button2Pressed();
-void ProcessLDR();
-void LDRSwiped();
-bool IsWiFiConnected();
-void InitializeInputDevices();
-void InitializeLCD();
-void InitializeWiFi();
-void UpdateValueFromAPI();
-void ReadResponseStream(HTTPClient&, char*, int);
-void RemoveAsteriskNotation(char*);
-bool ValidatePayloadFormat(char*);
-void WriteToLCD(const char*, const char* = "", bool = false);
-void PerformLCDAnimation();
-void InitializeEEPROM();
-void SaveConfigToEEPROM();
-void LoadConfigFromEEPROM();
+
+
 #pragma endregion FunctionDeclarations
 
 void setup() {
@@ -188,6 +163,10 @@ void loop() {
 }
 
 #pragma region FunctionDefinitions
+/*
+* Non-blocking check on whether the API needs polling.
+* When the polling interval has been reached, the API will be contacted for a value update.
+*/
 void ProcessAPIPolling() {
   static elapsedMillis _apiPollTimer = 10000; // Initialize to a value ready for polling. Static so will retain any updated values between invocations.
 
@@ -205,7 +184,7 @@ void ProcessAPIPolling() {
     }
     else {
       WriteToLCD("WiFi conn lost");
-      _currentValue[_selectedValueIndex] = "NULL";
+      strncpy(_currentValue[_selectedValueIndex], "NULL", MAX_VALUE_LENGTH);
       InitializeWiFi();
     }
 
@@ -213,6 +192,10 @@ void ProcessAPIPolling() {
   }
 }
 
+/*
+* Non-blocking check on the status of the buttons.
+* Checks if either button is being pushed or released and calls associated function.
+*/
 void ProcessButtons() {
   static const int debounceDelay = 50;             // How long the button pin must read (in milliseconds) without value fluctuation to be considered "input".
 
@@ -245,6 +228,10 @@ void ProcessButtons() {
   lastBtn2State = currentBtn2State;
 }
 
+/*
+* Called when button 1 is pressed for at least 50 ms.
+* Currently configured to cycle through the various LDR based LCD dimming modes.
+*/
 void Button1Pressed() {
   if (_selectedDisplayMode == On) {
     WriteToLCD("LCD backlight", "always off");
@@ -275,12 +262,22 @@ void Button1Pressed() {
     _lcd.backlight();
     _lcdBacklightOn = true;
   }
+
+  SaveConfigToEEPROM();
 }
 
+/*
+* Called when button 2 is pressed for at least 50ms.
+*/
 void Button2Pressed() {
   // Currently this does nothing. Provision for future.
 }
 
+/*
+* Non-blocking check on the status of the LDR.
+* Used to check whether the user is swiping or has swiped across the sensor, as well as the current level of room brightness.
+* If user swipe is detected, LDRSwiped() is called. Otherwise if the room is in a dark state, the backlight will be turned off if configured to do so.
+*/
 void ProcessLDR() {
   static const int debounceDelay = 50;                            // How long the LDR must read a consistant high or low value to be considered stable input.
   static const int minSwipeDarknessTime = 200;                    // The minimum amount of time (ms) the LDR must be in dark state to consider a thumb swipe as having stated.
@@ -330,10 +327,15 @@ void ProcessLDR() {
   previouslyReadingDarkness = readingDarkness;                    // Update value for next loop debouncing.
 }
 
+/*
+* Called when a users thumb swipe across the LDR is detected.
+* Thumb swipe should put the LDR into a dark state for between 200 and 3000ms.
+*/
 void LDRSwiped() {
   _selectedValueIndex++;                          // Increment the value to be shown. Wrap around if we move out of range.
   if (_selectedValueIndex >= API_VALUE_COUNT) {
     _selectedValueIndex = 0;
+    SaveConfigToEEPROM();
   }
 
   WriteToLCD(                                     // Display the summary for the currently selected option.
@@ -342,12 +344,18 @@ void LDRSwiped() {
   );
 }
 
+/*
+* Configures pinMode etc for the various button and LDR pins.
+*/
 void InitializeInputDevices() {
   pinMode(BTN_1_PIN, INPUT);
   pinMode(BTN_2_PIN, INPUT);
   pinMode(LDR_PIN, INPUT);
 }
 
+/*
+* Initializes I2C comms with the LCD. Sets backlight according to users preferences.
+*/
 void InitializeLCD() {
   DEBUG_SERIAL.println("Initializing LCD");
   
@@ -377,10 +385,18 @@ void InitializeLCD() {
   DEBUG_SERIAL.println("LCD initialized!");
 }
 
+/*
+* Returns true if WiFi is in state WL_CONNECTED. False otherwise.
+*/
 bool IsWiFiConnected() {
   return (WiFi.status() == WL_CONNECTED);
 }
 
+/*
+* Initializes the WiFi on the ESP. Attempts to connect using saved WiFi name and password.
+* If connection fails, a fallback hotspot is spun up, including a configuration web portal.
+* This method can also be used to attempt WiFi reconnections.
+*/
 void InitializeWiFi() {
   DEBUG_SERIAL.println("Initializing WiFi");
   WriteToLCD("WiFi connecting");
