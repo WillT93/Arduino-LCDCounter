@@ -23,124 +23,14 @@
 #include "controls_t93.h"
 #include "eeprom_t93.h"
 #include "enums_t93.h"
+#include "globals_t93.h"
 #include "lcd_t93.h"
 #include "secrets_t93.h"
 #include "wifi_t93.h"
 
-#pragma region PreProcessorDirectives
-// Helper methods
-#define LEN(arr) ((int) (sizeof (arr) / sizeof (arr)[0]))
-
 // Debugging configuration
 #define DEBUG                 true              // Optional printing of debug messages to serial.
-#define DEBUG_SERIAL          if (DEBUG) Serial
 #define EEPROM_INIT           false             // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
-
-#define BTN_1_PIN             34                // The input pin the first button is connected to.
-#define BTN_2_PIN             35                // The input pin the second button is connected to.
-#define LDR_PIN               32                // The input pin the LDR is connected to, must be capable of analog input reading.
-
-// WiFi / API configuration
-#define WIFI_RECONN_TIMEOUT   10                // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
-#define POLL_INTERVAL_SECONDS 30                // How often to poll the endpoint.
-#define API_VALUE_COUNT       3                 // The number of values this version of code expects from the API, values in excess will be discarded. There should be a _valueLabel entry for each of these in secrets file.
-#define RESPONSE_BUFFFER_SIZE 512               // The size of the buffer to read the API response string into. Must be at least as large as the length of the returned payload.
-#define MAX_VALUE_LENGTH      16                // The maximum length of each return value including termination character. Note we are only allowing up to 15 chars (plus termination) because we are using the 16th column for the folling indicator.
-#pragma endregion PreProcessorDirectives
-
-#pragma region Constants
-// The custom chars that make up the various animation frames.
-const byte animationCustomChars[][8] =
-{
-  {
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B
-  },
-  {
-    0x18,
-    0x18,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B
-  },
-  {
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x18,
-    0x18,
-    0x1B,
-    0x1B
-  },
-  {
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x03,
-    0x03,
-    0x1B,
-    0x1B
-  },
-  {
-    0x03,
-    0x03,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B,
-    0x1B
-  },
-  {
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00
-  }
-};
-
-// The characters that a single column must progress through in completion for one cycle of the animation. First digit is charater for upper row, second digit is for lower row.
-const int animationSequence[ANIM_FRAME_COUNT][LCD_ROWS] =
-{
-  { 5, 3 },
-  { 5, 4 },
-  { 3, 0 },
-  { 4, 0 },
-  { 1, 0 },
-  { 2, 0 },
-  { 5, 1 },
-  { 5, 2 },
-};
-#pragma endregion Constants
-
-#pragma region Globals
-hd44780_I2Cexp _lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
-char _currentValue[API_VALUE_COUNT][MAX_VALUE_LENGTH];  // The current values available to be rendered on the display. One for each API value. Length (incl termination char) is up to the number of columns we have as the last column is reserved for API polling indicator.
-bool _currentValueUpdated[API_VALUE_COUNT];             // Whether the latest value received from the API differs from what is currently being rendered. One for each API value.
-int _selectedValueIndex;                                // The statistic chosen to be displayed. API returns multiple, pipe delimited ints. The one selected here is what is rendered on the display.
-DisplayDimmingMode _selectedDisplayMode;                // How the display backlight should behave when the device is in a dark room.
-bool _lcdBacklightOn;                                   // Whether the LCD backlight is on.
-#pragma endregion Globals
-
-#pragma region FunctionDeclarations
-
-
-#pragma endregion FunctionDeclarations
 
 void setup() {
   if (EEPROM_INIT) {
