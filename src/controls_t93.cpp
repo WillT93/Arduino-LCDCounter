@@ -136,7 +136,6 @@ void ProcessLDR() {
   }
 
   if (debounceTimer > debounceDelay) {                            // Readings have stabilized.
-    DEBUG_SERIAL.println("LDR debounce passed");
     if (readingDarkness && !previouslyInDarkness) {               // Moving from light to dark.
       DEBUG_SERIAL.println("Moving from light state to dark state");
       previouslyInDarkness = true;                                // Have moved into a dark state.

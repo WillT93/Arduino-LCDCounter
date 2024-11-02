@@ -19,13 +19,13 @@ void InitializeLCD() {
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN < LDR_THRESHOLD)) {
+  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN) < LDR_THRESHOLD) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN >= LDR_THRESHOLD)) {
+  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN) >= LDR_THRESHOLD) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.backlight();
@@ -42,7 +42,6 @@ void InitializeLCD() {
 }
 
 void ProcessDisplayValueUpdate() {
-  DEBUG_SERIAL.println("Processing display value update");
   if (strcmp(_currentValue[_selectedValueIndex], "Unknown") == 0) {
     DEBUG_SERIAL.println("Invalid response returned from API");
     WriteToLCD("Invalid API", "response");
@@ -52,10 +51,6 @@ void ProcessDisplayValueUpdate() {
     WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
     _currentValueUpdated[_selectedValueIndex] = false;
   }
-  else {
-    DEBUG_SERIAL.println("No update found for LCD writing");
-  }
-  DEBUG_SERIAL.println("Display value update process complete");
 }
 
 /*
