@@ -32,6 +32,7 @@ void ProcessLDR() {
 
   if (recalibrationTimer > recalibrationInterval) {                 // Periodically update the swipe threshold to account for gradual changes in room brightness throughout the day.
     CalibrateLDRSwipeThreshold();
+    recalibrationTimer = 0;
   }
 
   if (_selectedDisplayMode == Auto) {
