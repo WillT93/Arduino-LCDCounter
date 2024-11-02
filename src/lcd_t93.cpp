@@ -20,13 +20,13 @@ void InitializeLCD() {
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && LDRReadingDarkness()) {
+  else if (_selectedDisplayMode == Auto && LDRReadingDecrease()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && !LDRReadingDarkness()) {
+  else if (_selectedDisplayMode == Auto && !LDRReadingDecrease()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.backlight();

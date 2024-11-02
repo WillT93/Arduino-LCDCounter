@@ -6,3 +6,5 @@ bool _currentValueUpdated[API_VALUE_COUNT];
 int _selectedValueIndex;
 DisplayDimmingMode _selectedDisplayMode;
 bool _lcdBacklightOn;
+extern int _ldrUpperThreshold;
+extern int _ldrLowerThreshold;
