@@ -4,7 +4,7 @@
 
 const char _valueLabel[3][17] = {
   "Active Prepay:",
-  "Active Mobile:",
+  "Active Postpay:",
   "Active Tahi:"
 };
 

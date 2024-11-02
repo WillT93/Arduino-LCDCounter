@@ -23,39 +23,60 @@ void InitializeInputDevices() {
 * Checks if either button is being pushed or released and calls associated function.
 */
 void ProcessButtons() {
-  static const int debounceDelay = 50;             // How long the button pin must read (in milliseconds) without value fluctuation to be considered "input".
+  static const int delayBeforeReturn = 2500;                      // How long to remain in the button cycling view after no button change before returning back to the stat display screen.
+  static const int debounceDelay = 50;                            // How long the button pin must read (in milliseconds) without value fluctuation to be considered "input".
 
-  static elapsedMillis btn1LastChanged = 10000;   // Init all three to a "long ago" value. Statics.
+  static elapsedMillis btn1LastChanged = 10000;                   // Init all three to a "long ago" value. Statics so this will only be the value on first boot.
   static elapsedMillis btn2LastChanged = 10000;
   
-  static bool lastBtn1State = LOW;                // Statics, will retain value between method invocations.
+  static bool lastBtn1State = LOW;                                // Statics, will retain value between method invocations.
   static bool lastBtn2State = LOW;
-  
-  // Button 1 processing
-  bool currentBtn1State = (digitalRead(BTN_1_PIN));
-  if (currentBtn1State != lastBtn1State) {
-    DEBUG_SERIAL.println("Button 1 state change detected");
-    btn1LastChanged = 0;
-  }
-  if (btn1LastChanged >= debounceDelay && currentBtn1State == HIGH) {
-    DEBUG_SERIAL.println("Button 1 debounce passed");
-    Button1Pressed();
-    btn1LastChanged = 0;
-  }
-  lastBtn1State = currentBtn1State;
 
-  // Button 2 processing
-  bool currentBtn2State = (digitalRead(BTN_2_PIN));
-  if (currentBtn2State != lastBtn2State) {
-    DEBUG_SERIAL.println("Button 2 state change detected");
-    btn2LastChanged = 0;
+  bool btn1Actioned = false;                                      // Whether the action associated with button 1 occured in this invocation. If so, post-button action steps will occur after the "delayBeforeReturn" timout.
+  bool btn2Actioned = false;
+  
+  while (true) {                                                  // Blocking loop that prevents return to caller (and thus UI freezing due to API polling) within it button state is evaluated (debounced). Specific conditions allow for returns.
+    // Button 1 processing
+    bool currentBtn1State = (digitalRead(BTN_1_PIN));
+    if (currentBtn1State != lastBtn1State) {
+      DEBUG_SERIAL.println("Button 1 state change detected");
+      btn1LastChanged = 0;
+    }
+    if (btn1LastChanged >= debounceDelay && currentBtn1State == HIGH) {
+      DEBUG_SERIAL.println("Button 1 debounce passed");
+      Button1Pressed();
+      btn1Actioned = true;
+    }
+    lastBtn1State = currentBtn1State;
+
+    // Button 2 processing
+    bool currentBtn2State = (digitalRead(BTN_2_PIN));
+    if (currentBtn2State != lastBtn2State) {
+      DEBUG_SERIAL.println("Button 2 state change detected");
+      btn2LastChanged = 0;
+    }
+    if (btn2LastChanged >= debounceDelay && currentBtn2State == HIGH) {
+      DEBUG_SERIAL.println("Button 2 debounce passed");
+      Button2Pressed();
+      btn2Actioned = true;
+    }
+    lastBtn2State = currentBtn2State;
+
+    if (!btn1Actioned && !btn2Actioned) {                         // If no button was pressed, return immediately, this essentially prevents any looping from taking place during 99% of invocations.
+      return;
+    }
+
+    if (btn1Actioned && btn1LastChanged > delayBeforeReturn) {    // Post-button 1 actions that should be performed after a timeout.
+      SaveConfigToEEPROM();
+      ProcessDisplayValueUpdate(true);                            // Call display update with override value to clear the button message from the screen and display the stat again.
+      return;
+    }
+
+    if (btn2Actioned && btn2LastChanged > delayBeforeReturn) {    // Post-button 2 actions that should be performed after a timeout.
+      // Currently none.
+      return;
+    }
   }
-  if (btn2LastChanged >= debounceDelay && currentBtn2State == HIGH) {
-    DEBUG_SERIAL.println("Button 2 debounce passed");
-    Button2Pressed();
-    btn2LastChanged = 0;
-  }
-  lastBtn2State = currentBtn2State;
 }
 
 /*
@@ -126,8 +147,8 @@ void Button2Pressed() {
 */
 void ProcessLDR() {
   static const int debounceDelay = 50;                            // How long the LDR must read a consistant high or low value to be considered stable input.
-  static const int minSwipeDarknessTime = 200;                    // The minimum amount of time (ms) the LDR must be in dark state to consider a thumb swipe as having stated.
-  static const int maxSwipeDarknessTime = 3000;                   // After this time (ms) it is unlikely to be a thumb swipe and more likely to be the lights turning off.
+  static const int minSwipeDarknessTime = 150;                    // The minimum amount of time (ms) the LDR must be in dark state to consider a thumb swipe as having stated.
+  static const int maxSwipeDarknessTime = 2500;                   // After this time (ms) it is unlikely to be a thumb swipe and more likely to be the lights turning off.
 
   static elapsedMillis debounceTimer;                             // Timer for debouncing LDR readings.
   static bool previouslyReadingDarkness;                          // LDR reading from the previous invocation. Used for debouncing, not for tracking complete state changes.
@@ -211,4 +232,7 @@ void LDRSwiped() {
     _valueSelectionSummary[_selectedValueIndex][0],
     _valueSelectionSummary[_selectedValueIndex][1]
   );
+
+  delay(2000);
+  ProcessDisplayValueUpdate(true);
 }
