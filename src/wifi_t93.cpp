@@ -74,6 +74,7 @@ void InitializeWiFi() {
 
   DEBUG_SERIAL.println("WiFi connected!");
   WriteToLCD("WiFi connected!");
+  DEBUG_SERIAL.println("WiFi initialized");
 }
 
 /*

@@ -57,7 +57,7 @@ void UpdateValueFromAPI() {
   if (httpResponseCode > 0) {
     ReadResponseStream(https, responseBuffer, RESPONSE_BUFFFER_SIZE);       // Reads the API response into the responseBuffer char array.
     RemoveAsteriskNotation(responseBuffer);                                 // Removes the * used to inform the 7-seg display which value to display. Unused on LCD units.
-    bool validResponse = ValidatePayloadFormat(responseBuffer);             // Ensures there are at least as many values as we specify in API_VALUE_COUNT.
+    bool validResponse = ValidatePayloadFormat(responseBuffer);             // Ensures there are at least as many values as API_VALUE_COUNT.
 
     if (!validResponse) {
       DEBUG_SERIAL.println("Invalid API response");
@@ -69,7 +69,7 @@ void UpdateValueFromAPI() {
     char* token = strtok(responseBuffer, "|");                              // Gets the first token (the first value in the string prior to the first '|' operator).
     int index = 0;
 
-    while (token != nullptr && index < API_VALUE_COUNT) {                   // While there are values to be read (ValidatePayloadFormat() should have handled this) and we haven't read all the values we expect...
+    while (token != nullptr && index < API_VALUE_COUNT) {                   // While there are values to be read (ValidatePayloadFormat() should have handled this) and haven't read all the values expected...
       if (strcmp(previousValue[index], token) != 0) {                       // If the value differs from what it was previously...
         _currentValueUpdated[index] = true;                                 // Mark as updated.
         strncpy(_currentValue[index], token, MAX_VALUE_LENGTH);             // Copy the new value into the _currentValue array for eventual displaying.
@@ -97,7 +97,7 @@ void UpdateValueFromAPI() {
     }
   }
   else {
-    DEBUG_SERIAL.println("Unable to contact API");                          // In the event we have WiFi but the API is unreachable
+    DEBUG_SERIAL.println("Unable to contact API");                          // In the event WiFi is connected but the API is unreachable
     for (int i = 0; i < API_VALUE_COUNT; i++) {
       strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);
     }
@@ -118,8 +118,8 @@ void ReadResponseStream(HTTPClient& https, char* buffer, int bufferSize) {
   
   int bytesRead = 0;
   while (stream->available()) {                                 // While there is data available in the stream...
-    if (bytesRead == bufferSize - 1) {                          // If we have reached the end of the space in the buffer...
-      DEBUG_SERIAL.println("resonseBuffer exhausted prior to payload completion. Possibly this is fine if we are only using a subset of the first few values in the response.");
+    if (bytesRead == bufferSize - 1) {                          // If end of buffer is reached...
+      DEBUG_SERIAL.println("resonseBuffer exhausted prior to payload completion. Possibly this is fine id only using a subset of the first few values in the response.");
       break;
     }
     buffer[bytesRead] = stream->read();                         // Read each byte into the buffer.
@@ -161,20 +161,20 @@ void RemoveAsteriskNotation(char* buffer) {
 }
 
 /*
-* Iterates across the payload from the API. Validates there are enough pipe delimiters for there to be at least as many values from the API as we are expecting.
+* Iterates across the payload from the API. Validates there are enough pipe delimiters for there to be at least as many values from the API as expected in API_VALUE_COUNT.
 */
 bool ValidatePayloadFormat(char* buffer) {
   DEBUG_SERIAL.println("Validating resulting payload format for sufficient API values");
   int pipeCount = 0;
   for (int i= 0; i < RESPONSE_BUFFFER_SIZE; i++) {    // For each character in the buffer...
-    if (buffer[i] == '\0') {                          // If we reached the end of the buffer without returning true, there weren't enough values in the payload.
+    if (buffer[i] == '\0') {                          // If the end of the buffer is reached without returning true, there weren't enough values in the payload.
       DEBUG_SERIAL.println("Insufficient values located in responseBuffer");
       return false;
     }
-    if (buffer[i] == '|') {                           // If we find a pipe delimiter, we have found a value preceeding it.
+    if (buffer[i] == '|') {                           // If pipe delimiter found, there is a value preceeding it.
       pipeCount++;
     }
-    if (pipeCount == API_VALUE_COUNT - 1) {           // There is one less pipe delimiter than there are values. Finding this many means we have enough values.
+    if (pipeCount == API_VALUE_COUNT - 1) {           // There is one less pipe delimiter than there are values. Finding this many means enough values have been located.
       DEBUG_SERIAL.println("Payload passed validation");
       return true;
     }
