@@ -15,6 +15,7 @@ void InitializeInputDevices() {
   pinMode(BTN_1_PIN, INPUT);
   pinMode(BTN_2_PIN, INPUT);
   pinMode(LDR_PIN, INPUT);
+  DEBUG_SERIAL.println("Controls initialized");
 }
 
 /*
@@ -138,11 +139,11 @@ void ProcessLDR() {
     DEBUG_SERIAL.println("LDR debounce passed");
     if (readingDarkness && !previouslyInDarkness) {               // Moving from light to dark.
       DEBUG_SERIAL.println("Moving from light state to dark state");
-      previouslyInDarkness = true;                                // We have moved into a dark state.
-      darkTimer = 0;                                              // Begin tracking how long we have been in darkness.
+      previouslyInDarkness = true;                                // Have moved into a dark state.
+      darkTimer = 0;                                              // Begin tracking how long the unit has been in darkness.
     }
 
-    if (readingDarkness && previouslyInDarkness) {                // We are currently in darkness, and have been for a while.
+    if (readingDarkness && previouslyInDarkness) {                // Currently in darkness, and have been for a while.
       DEBUG_SERIAL.println("Remaining in dark state from previously dark state");
       if (darkTimer > maxSwipeDarknessTime && _lcdBacklightOn) {  // Have been in darkness long enough to turn off backlight.
         DEBUG_SERIAL.println("Duration has passed to consider the room dark");
@@ -187,7 +188,7 @@ void ProcessLDR() {
 */
 void LDRSwiped() {
   DEBUG_SERIAL.println("LDR swipe action commencing");
-  _selectedValueIndex++;                          // Increment the value to be shown. Wrap around if we move out of range.
+  _selectedValueIndex++;                          // Increment the value to be shown. Wrap around if moved out of range.
   if (_selectedValueIndex >= API_VALUE_COUNT) {
     _selectedValueIndex = 0;
   }

@@ -10,23 +10,30 @@ void InitializeLCD() {
   
   _lcd.init();
   if (_selectedDisplayMode == On) {
+    DEBUG_SERIAL.println("LCD backlight config set to Always On");
     _lcd.backlight();
     _lcdBacklightOn = true;
   }
   else if (_selectedDisplayMode == Off) {
+    DEBUG_SERIAL.println("LCD backlight config set to Always Off");
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
   else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN < LDR_THRESHOLD)) {
+    DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
+    DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
   else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN >= LDR_THRESHOLD)) {
+    DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
+    DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.backlight();
     _lcdBacklightOn = true;
   }  
   
   // Import the custom chars into the LCD config.
+  DEBUG_SERIAL.println("Importing LCD custom characters");
   for (int i = 0; i < LEN(animationCustomChars); i++) {
     _lcd.createChar(i, animationCustomChars[i]);
   }
@@ -35,14 +42,20 @@ void InitializeLCD() {
 }
 
 void ProcessDisplayValueUpdate() {
+  DEBUG_SERIAL.println("Processing display value update");
   if (strcmp(_currentValue[_selectedValueIndex], "Unknown") == 0) {
     DEBUG_SERIAL.println("Invalid response returned from API");
     WriteToLCD("Invalid API", "response");
   }
   else if (_currentValueUpdated[_selectedValueIndex]) {
+    DEBUG_SERIAL.println("Updated value found for writing to LCD");
     WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
     _currentValueUpdated[_selectedValueIndex] = false;
   }
+  else {
+    DEBUG_SERIAL.println("No update found for LCD writing");
+  }
+  DEBUG_SERIAL.println("Display value update process complete");
 }
 
 /*
@@ -54,6 +67,7 @@ void WriteToLCD(const char* topRow, const char* bottomRow, bool animate) {
     PerformLCDAnimation();
   }
 
+  DEBUG_SERIAL.println("Writing new value to LCD");
   _lcd.clear();
   _lcd.setCursor(0, 0);
   _lcd.print(topRow);
@@ -65,6 +79,7 @@ void WriteToLCD(const char* topRow, const char* bottomRow, bool animate) {
 * Clears the LCD and performs a sine-wave animation on it. Used when the value updates to draw the users attention.
 */
 void PerformLCDAnimation() {
+  DEBUG_SERIAL.println("Performing LCD animation");
   _lcd.clear();
   for (int i = 0; i < 3; i++) {                               // Loop the animation three times.
     for (int frame = 0; frame < ANIM_FRAME_COUNT; frame++) {  // For each frame in the animation...

@@ -2,9 +2,6 @@
 // TODO: LDR value selection.  (needs testing)
 // TODO: Configuration cycling for different LDR modes. (Needs testing)
 // TODO: Run packet analysis.
-// TODO: More serial debug logs.
-// TODO: Update secrets sample.
-// TODO: remove "we" from comments
 
 #include <Arduino.h>
 
