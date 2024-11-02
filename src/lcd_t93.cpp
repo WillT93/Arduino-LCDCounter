@@ -1,4 +1,5 @@
 #include "globals_t93.h"
+#include "secrets_t93.h"
 #include "lcd_t93.h"
 
 /*
@@ -31,6 +32,17 @@ void InitializeLCD() {
   }
   
   DEBUG_SERIAL.println("LCD initialized!");
+}
+
+void ProcessDisplayValueUpdate() {
+  if (strcmp(_currentValue[_selectedValueIndex], "Unknown") == 0) {
+    DEBUG_SERIAL.println("Invalid response returned from API");
+    WriteToLCD("Invalid API", "response");
+  }
+  else if (_currentValueUpdated[_selectedValueIndex]) {
+    WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
+    _currentValueUpdated[_selectedValueIndex] = false;
+  }
 }
 
 /*
