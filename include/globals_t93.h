@@ -21,10 +21,13 @@
 #define LCD_ROWS              2     // Number of rows in the LCD.
 #define LCD_ADDRESS           0x27  // The I2C address the LCD lives at. Can be found using an I2C scanning sketch.
 
-// Controls
+// Buttons
 #define BTN_1_PIN             34    // The input pin the first button is connected to.
 #define BTN_2_PIN             35    // The input pin the second button is connected to.
+
+// LDR
 #define LDR_PIN               32    // The input pin the LDR is connected to, must be capable of analog input reading.
+#define LDR_DARK_ROOM_THRESH  1000  // The value the LDR must be 250pt below to turn the backlight off and 250pt above to turn the backlight on.
 
 // WiFi / API
 #define WIFI_RECONN_TIMEOUT   10    // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
@@ -39,7 +42,6 @@ extern bool _currentValueUpdated[API_VALUE_COUNT];                  // Whether t
 extern int _selectedValueIndex;                                     // The statistic chosen to be displayed. API returns multiple, pipe delimited ints. The one selected here is what is rendered on the display.
 extern DisplayDimmingMode _selectedDisplayMode;                     // How the display backlight should behave when the device is in a dark room.
 extern bool _lcdBacklightOn;                                        // Whether the LCD backlight is on.
-extern int _ldrUpperThreshold;                                      // A percentage threshold above the nominal LDR reading that should be considered an "increase" in measured light. Used to detect lights turning on. Refreshes every minute.
-extern int _ldrLowerThreshold;                                      // A percentage threshold below the nominal LDR reading that should be considered a "decrease" in measured light. Used to detect lights being turned off or thumb swipes. Refreshes every minute.
+extern int _ldrSwipeThreshold;                                      // The nominal value of the LDR with 15% removed. Updated every minute. When the LDR is below this value for a brief period, it is considered to be a thumb swipe.
 
 #endif

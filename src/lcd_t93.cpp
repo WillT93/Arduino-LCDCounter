@@ -1,6 +1,6 @@
 #include "globals_t93.h"
 #include "secrets_t93.h"
-#include "controls_t93.h"
+#include "ldr_t93.h"
 #include "lcd_t93.h"
 
 /*
@@ -20,13 +20,13 @@ void InitializeLCD() {
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && LDRReadingDecrease()) {
+  else if (_selectedDisplayMode == Auto && LDRBelowDarkRoomThreshold()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && !LDRReadingDecrease()) {
+  else if (_selectedDisplayMode == Auto && !LDRBelowDarkRoomThreshold()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.backlight();

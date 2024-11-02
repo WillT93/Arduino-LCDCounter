@@ -5,11 +5,12 @@
 #include <Arduino.h>
 
 #include "api_t93.h"
-#include "controls_t93.h"
+#include "buttons_t93.h"
 #include "eeprom_t93.h"
 #include "enums_t93.h"
 #include "globals_t93.h"
 #include "lcd_t93.h"
+#include "ldr_t93.h"
 #include "secrets_t93.h"
 #include "wifi_t93.h"
 
@@ -22,7 +23,8 @@ void setup() {
   DEBUG_SERIAL.begin(9600);
 
   LoadConfigFromEEPROM();
-  InitializeInputDevices();
+  InitializeButtons();
+  InitializeLDR();
   InitializeLCD();
   InitializeWiFi();
 }
