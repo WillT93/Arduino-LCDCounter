@@ -11,7 +11,7 @@
 * When the polling interval has been reached, the API will be contacted for a value update.
 */
 void ProcessAPIPolling() {
-  static elapsedMillis _apiPollTimer = 10000; // Initialize to a value ready for polling. Static so will retain any updated values between invocations.
+  static elapsedMillis _apiPollTimer = 30000; // Initialize to a value ready for polling. Static so will retain any updated values between invocations.
 
   if (_apiPollTimer >= POLL_INTERVAL_SECONDS * 1000) {
     DEBUG_SERIAL.println("Beginning API polling process");
@@ -115,19 +115,53 @@ void UpdateValueFromAPI() {
 void ReadResponseStream(HTTPClient& https, char* buffer, int bufferSize) {
   DEBUG_SERIAL.println("Reading response stream from API");
   WiFiClient* stream = https.getStreamPtr();                    // Gets the pointer to the stream of contents waiting to be read.
-  
-  int bytesRead = 0;
-  while (stream->available()) {                                 // While there is data available in the stream...
-    if (bytesRead == bufferSize - 1) {                          // If end of buffer is reached...
-      DEBUG_SERIAL.println("resonseBuffer exhausted prior to payload completion. Possibly this is fine id only using a subset of the first few values in the response.");
+
+  int bytesRead = 0;                                            // Number of information bytes read from the stream.
+  char chunkSizeBuffer[10];                                     // Small buffer to store chunk size in hex.
+  int chunkSize = 0;                                            // HTTP responses are broken into chunks. This is needed due to the way stream->read() handles them. IDK.
+
+  while (stream->connected() && stream->available()) {          // While there is data available in the stream...
+    int chunkSizeIndex = 0;
+    while (true) {                                              // Read the chunk size line character by character until you hit '\n'.
+        char c = stream->read();
+        if (c == '\n') break;                                   // Stop at the end of the line.
+        if (c == '\r') {                                        // Ignore '\r' characters.
+          continue;
+        }                                             
+        chunkSizeBuffer[chunkSizeIndex] = c;
+        chunkSizeIndex++;
+    }
+    chunkSizeBuffer[chunkSizeIndex] = '\0';                     // Null-terminate the chunk size string.
+    
+    chunkSize = strtol(chunkSizeBuffer, nullptr, 16);           // Convert hex string to integer for the chunk size.
+    if (chunkSize == 0) {                                       // Check if this is the final chunk (size 0 means end of response).
       break;
     }
-    buffer[bytesRead] = stream->read();                         // Read each byte into the buffer.
-    bytesRead++;
+
+    DEBUG_SERIAL.print("Byte-by-byte contents (excl chunk data): ");
+    for (int i = 0; i < chunkSize; i++) {                       // Read exactly `chunkSize` bytes into the buffer.
+      if (bytesRead == bufferSize - 1) {                        // If end of buffer is reached...
+        DEBUG_SERIAL.println("resonseBuffer exhausted prior to payload completion. Possibly this is fine id only using a subset of the first few values in the response.");
+        break;
+      }
+
+      if (stream->available()) {                                // Reading of actual payload information.
+        char character = stream->read();
+        DEBUG_SERIAL.print(character);
+        buffer[bytesRead] = character;                          // Read each byte into the buffer.
+        bytesRead++;
+      }
+    }
+    DEBUG_SERIAL.println();
+
+    if (stream->available()) stream->read();                    // Skip the trailing newline after each chunk
   }
   DEBUG_SERIAL.print("Read ");
   DEBUG_SERIAL.print(bytesRead);
   DEBUG_SERIAL.println(" bytes into responseBuffer");
+
+  DEBUG_SERIAL.print("responseBuffer contains: ");
+  DEBUG_SERIAL.println(buffer);
   
   buffer[bytesRead] = '\0';                                     // Ensure null termination of the string.
 }
@@ -150,6 +184,10 @@ void RemoveAsteriskNotation(char* buffer) {
         buffer[j] = buffer[j + 1];
         if (buffer[j] == '\0') {                              // If the end of the string has been reached then return.
           DEBUG_SERIAL.println("End of string located within buffer");
+
+          DEBUG_SERIAL.print("responseBuffer contains: ");
+          DEBUG_SERIAL.println(buffer);
+
           return;
         }
       }
