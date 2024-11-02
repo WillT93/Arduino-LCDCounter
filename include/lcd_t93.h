@@ -83,6 +83,7 @@ const int animationSequence[ANIM_FRAME_COUNT][LCD_ROWS] =
 };
 
 void InitializeLCD();
+void ProcessDisplayValueUpdate();
 void WriteToLCD(const char*, const char* = "", bool = false);
 void PerformLCDAnimation();
 

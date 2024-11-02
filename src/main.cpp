@@ -3,9 +3,8 @@
 // TODO: Configuration cycling for different LDR modes. (Needs testing)
 // TODO: Run packet analysis.
 // TODO: More serial debug logs.
-// TODO: More inline comments.
-// TODO: break into smaller .cpp and .h.
-// TODO: look into warnings about array bounds
+// TODO: Update secrets sample.
+// TODO: remove "we" from comments
 
 #include <Arduino.h>
 
@@ -34,6 +33,7 @@ void setup() {
 
 void loop() {
   ProcessAPIPolling();
+  ProcessDisplayValueUpdate();
   ProcessButtons();
   ProcessLDR();
 }
