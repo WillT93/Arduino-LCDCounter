@@ -8,6 +8,7 @@ void Button1Pressed();
 void Button2Pressed();
 
 void ProcessLDR();
+bool LDRReadingDarkness();
 void LDRSwiped();
 
 #endif

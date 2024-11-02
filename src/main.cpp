@@ -1,6 +1,5 @@
 // TODO: LDR display blanking. (needs testing)
 // TODO: LDR value selection.  (needs testing)
-// TODO: Configuration cycling for different LDR modes. (Needs testing)
 // TODO: Run packet analysis.
 
 #include <Arduino.h>
