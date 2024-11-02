@@ -65,6 +65,8 @@ void ProcessButtons() {
 void Button1Pressed() {
   DEBUG_SERIAL.println("Button 1 action commencing");
   if (_selectedDisplayMode == On) {
+    _lcd.backlight();
+    delay(50);
     DEBUG_SERIAL.println("Setting display backlight to Always Off");
     WriteToLCD("LCD backlight", "always off");
     delay(2000);
@@ -74,11 +76,13 @@ void Button1Pressed() {
   }
 
   else if (_selectedDisplayMode == Off) {
+    _lcd.backlight();
+    delay(50);
     DEBUG_SERIAL.println("Setting display backlight to Auto");
     WriteToLCD("LCD backlight", "Auto (light dep)");
     delay(2000);
     _selectedDisplayMode = Auto;
-    if (analogRead(LDR_PIN < LDR_THRESHOLD)) {
+    if (LDRReadingDarkness()) {
       DEBUG_SERIAL.print("Turning backlight off based on LDR level of ");
       DEBUG_SERIAL.println(analogRead(LDR_PIN));
       _lcd.noBacklight();
@@ -93,6 +97,8 @@ void Button1Pressed() {
   }
 
   else if (_selectedDisplayMode == Auto) {
+    _lcd.backlight();
+    delay(50);
     DEBUG_SERIAL.println("Setting display backlight to Always On");
     WriteToLCD("LCD backlight", "always on");
     delay(2000);
@@ -102,6 +108,7 @@ void Button1Pressed() {
   }
 
   SaveConfigToEEPROM();
+  ProcessDisplayValueUpdate(true);        // Call display update with override value to clear the button message from the screen and display the stat again.
 }
 
 /*
@@ -128,7 +135,7 @@ void ProcessLDR() {
   static elapsedMillis darkTimer;                                 // Timer for tracking darkness duration.
   static bool previouslyInDarkness = false;                       // Tracks if LDR has been in stable darkness. Not to be confused with previouslyReadingDarkness.
 
-  bool readingDarkness = analogRead(LDR_PIN) < LDR_THRESHOLD;
+  bool readingDarkness = LDRReadingDarkness();
   
   if (readingDarkness != previouslyReadingDarkness) {             // Debounce the LDR input.
     DEBUG_SERIAL.println("LDR state change detected");
@@ -179,6 +186,10 @@ void ProcessLDR() {
   }
 
   previouslyReadingDarkness = readingDarkness;                    // Update value for next loop debouncing.
+}
+
+bool LDRReadingDarkness() {
+  return analogRead(LDR_PIN) < LDR_THRESHOLD;
 }
 
 /*

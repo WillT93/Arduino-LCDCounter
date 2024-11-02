@@ -1,5 +1,6 @@
 #include "globals_t93.h"
 #include "secrets_t93.h"
+#include "controls_t93.h"
 #include "lcd_t93.h"
 
 /*
@@ -19,13 +20,13 @@ void InitializeLCD() {
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN) < LDR_THRESHOLD) {
+  else if (_selectedDisplayMode == Auto && LDRReadingDarkness()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.noBacklight();
     _lcdBacklightOn = false;
   }
-  else if (_selectedDisplayMode == Auto && analogRead(LDR_PIN) >= LDR_THRESHOLD) {
+  else if (_selectedDisplayMode == Auto && !LDRReadingDarkness()) {
     DEBUG_SERIAL.print("LCD backlight config set to Auto and LDR reading is: ");
     DEBUG_SERIAL.println(analogRead(LDR_PIN));
     _lcd.backlight();
@@ -41,14 +42,20 @@ void InitializeLCD() {
   DEBUG_SERIAL.println("LCD initialized!");
 }
 
-void ProcessDisplayValueUpdate() {
+void ProcessDisplayValueUpdate(bool override) {
   if (strcmp(_currentValue[_selectedValueIndex], "Unknown") == 0) {
     DEBUG_SERIAL.println("Invalid response returned from API");
     WriteToLCD("Invalid API", "response");
   }
-  else if (_currentValueUpdated[_selectedValueIndex]) {
-    DEBUG_SERIAL.println("Updated value found for writing to LCD");
-    WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
+  else if (_currentValueUpdated[_selectedValueIndex] || override) {
+    if (!override) {
+      DEBUG_SERIAL.println("Updated value found for writing to LCD");
+      WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
+    }
+    else {
+      DEBUG_SERIAL.println("Override option passed, refreshing with known values");
+      WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], false);
+    }
     _currentValueUpdated[_selectedValueIndex] = false;
   }
 }
@@ -62,7 +69,12 @@ void WriteToLCD(const char* topRow, const char* bottomRow, bool animate) {
     PerformLCDAnimation();
   }
 
-  DEBUG_SERIAL.println("Writing new value to LCD");
+  DEBUG_SERIAL.print("LCD write: ");
+  DEBUG_SERIAL.print(topRow);
+  if (strcmp(bottomRow, "") != 0) {
+    DEBUG_SERIAL.print(" ");
+  }
+  DEBUG_SERIAL.println(bottomRow);
   _lcd.clear();
   _lcd.setCursor(0, 0);
   _lcd.print(topRow);
