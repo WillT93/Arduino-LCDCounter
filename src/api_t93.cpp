@@ -39,11 +39,11 @@ void UpdateValueFromAPI() {
   _lcd.setCursor(15, 1); // Little dot in bottom right section shows API being polled.
   _lcd.print(".");
 
-  static char responseBuffer[RESPONSE_BUFFFER_SIZE];                        // For manipulating the response from the API.
+  static char responseBuffer[RESPONSE_BUFFER_SIZE];                        // For manipulating the response from the API.
 
   WiFiClientSecure client;
   HTTPClient https;
-  
+
   client.setInsecure();                                                     // The endpoint being hit is an https endpoint, but it doesn't require certs etc.
   https.begin(client, SECRET_API_ENDPOINT);
   https.addHeader("X-API-KEY", SECRET_API_KEY);                             // Using X-API-KEY header as auth function on endpoint.
@@ -56,7 +56,7 @@ void UpdateValueFromAPI() {
   if (httpResponseCode > 0) {
     String response = https.getString();                                    // Pulls the response out, unfortunately uses String, but using .getStream() was proving to be riskier depending on how the API returns the payload, headers, chunking etc.
 
-    if (response.length() >= RESPONSE_BUFFFER_SIZE) {                       // Ensures the response isn't too large to fit in the buffer.
+    if (response.length() >= RESPONSE_BUFFER_SIZE) {                       // Ensures the response isn't too large to fit in the buffer.
       DEBUG_SERIAL.println("Response too large for buffer!");
       WriteToLCD("API response", "too large");
       for (int i = 0; i < API_VALUE_COUNT; i++) {
@@ -69,8 +69,8 @@ void UpdateValueFromAPI() {
       return;
     }
 
-    strncpy(responseBuffer, response.c_str(), RESPONSE_BUFFFER_SIZE - 1);   // Copy string content to responseBuffer. Doing this means we can immediately dispose of the String variable.
-    responseBuffer[RESPONSE_BUFFFER_SIZE - 1] = '\0';                       // Ensure null termination
+    strncpy(responseBuffer, response.c_str(), RESPONSE_BUFFER_SIZE - 1);   // Copy string content to responseBuffer. Doing this means we can immediately dispose of the String variable.
+    responseBuffer[RESPONSE_BUFFER_SIZE - 1] = '\0';                       // Ensure null termination
     response.clear();
     
     RemoveAsteriskNotation(responseBuffer);                                 // Removes the * used to inform the 7-seg display which value to display. Unused on LCD units.
@@ -135,7 +135,7 @@ void UpdateValueFromAPI() {
 */
 void RemoveAsteriskNotation(char* buffer) {
   DEBUG_SERIAL.println("Stripping asterisk notation");
-  for (int i = 0; i < RESPONSE_BUFFFER_SIZE; i++) {           // For each index in the buffer array...
+  for (int i = 0; i < RESPONSE_BUFFER_SIZE; i++) {           // For each index in the buffer array...
     if (buffer[i] == '\0') {                                  // If the end of the string is reached then exit.
       DEBUG_SERIAL.println("End of string located prior to asterisk");
       return;
@@ -143,7 +143,7 @@ void RemoveAsteriskNotation(char* buffer) {
     if (buffer[i] == '*') {                                   // Once the '*' is found...
       DEBUG_SERIAL.print("Asterisk located at buffer index ");
       DEBUG_SERIAL.println(i);
-      for (int j = i; j < RESPONSE_BUFFFER_SIZE - 1; j++) {   // Starting at the current index, work along the string and shift all characters left, overwriting the '*'.
+      for (int j = i; j < RESPONSE_BUFFER_SIZE - 1; j++) {   // Starting at the current index, work along the string and shift all characters left, overwriting the '*'.
         buffer[j] = buffer[j + 1];
         if (buffer[j] == '\0') {                              // If the end of the string has been reached then return.
           DEBUG_SERIAL.println("End of string located within buffer");
@@ -154,7 +154,7 @@ void RemoveAsteriskNotation(char* buffer) {
           return;
         }
       }
-      buffer[RESPONSE_BUFFFER_SIZE - 1] = '\0';               // Otherwise, if the end of the array is reached (minus the removed '*') terminate the string and return.
+      buffer[RESPONSE_BUFFER_SIZE - 1] = '\0';               // Otherwise, if the end of the array is reached (minus the removed '*') terminate the string and return.
       DEBUG_SERIAL.println("End of buffer reached before string termination character. This should never happen");
       return;
     }
@@ -167,7 +167,7 @@ void RemoveAsteriskNotation(char* buffer) {
 bool ValidatePayloadFormat(char* buffer) {
   DEBUG_SERIAL.println("Validating resulting payload format for sufficient API values");
   int pipeCount = 0;
-  for (int i= 0; i < RESPONSE_BUFFFER_SIZE; i++) {    // For each character in the buffer...
+  for (int i= 0; i < RESPONSE_BUFFER_SIZE; i++) {    // For each character in the buffer...
     if (buffer[i] == '\0') {                          // If the end of the buffer is reached without returning true, there weren't enough values in the payload.
       DEBUG_SERIAL.println("Insufficient values located in responseBuffer");
       return false;
