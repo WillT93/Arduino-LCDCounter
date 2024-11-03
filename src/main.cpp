@@ -1,7 +1,3 @@
-// TODO: LDR display blanking. (needs testing)
-// TODO: LDR value selection.  (needs testing)
-// TODO: Run packet analysis.
-
 #include <Arduino.h>
 
 #include "api_t93.h"

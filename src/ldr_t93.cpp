@@ -13,33 +13,18 @@
 */
 void InitializeLDR() {
   DEBUG_SERIAL.println("Initializing LDR");
-  
   pinMode(LDR_PIN, INPUT);
-  CalibrateLDRSwipeThreshold();
-
   DEBUG_SERIAL.println("LDR Initialized");
 }
 
 /*
 * Non-blocking check on the status of the LDR.
-* Used to check whether the user is swiping or has swiped across the sensor, as well as the current level of room brightness.
-* If user swipe is detected, LDRSwiped() is called. Otherwise if the room is in a dark state, the backlight will be turned off if configured to do so.
+* If Auto backlight configured, turns LCD backlight off in a dark toom.
 */
 void ProcessLDR() {
-  static const int recalibrationInterval = 60000;                   // The interval with which the LDR will recalibrate it's value. This will also happen when it detects the lights turning on and off.
-
-  static elapsedMillis recalibrationTimer = 0;                      // Timer to track recalibration runs.
-
-  if (recalibrationTimer > recalibrationInterval) {                 // Periodically update the swipe threshold to account for gradual changes in room brightness throughout the day.
-    CalibrateLDRSwipeThreshold();
-    recalibrationTimer = 0;
-  }
-
   if (_selectedDisplayMode == Auto) {
     UpdateBacklightPerLightLevel();
   }
-
-  ProcessSwiping();
 }
 
 /*
@@ -108,24 +93,11 @@ void UpdateBacklightPerLightLevel() {
 }
 
 /*
-* Updates the swipe threshold the LDR must be reading below to consider a thumb swipe to be taking place.
-* Percentage decrease must be at least 100pts, otherwise 100pts is used as threshold delta.
-* Cannot be lower than 0.
-*/
-void CalibrateLDRSwipeThreshold() {
-  DEBUG_SERIAL.println("Calibrating LDR");
-  int currentValue = analogRead(LDR_PIN);
-  _ldrSwipeThreshold = max(0, min((int)(currentValue * 0.75), currentValue - 100));     // Set to the lesser of 15% below it's current value or 100pts below, not going any lower than 0.
-  DEBUG_SERIAL.print("LDR calibrated with swipe threshold of: ");
-  DEBUG_SERIAL.println(_ldrSwipeThreshold);
-}
-
-/*
 * True if the LDR is reading a value below the dark room threshold (with a margin).
 * This indicates the room is dark enough to turn off the backlight when the LCD is in Auto mode.
 */
 bool LDRBelowDarkRoomThreshold() {
-  return analogRead(LDR_PIN) <= max(LDR_DARK_ROOM_THRESH - 250, 0);
+  return analogRead(LDR_PIN) <= max(LDR_DARK_ROOM_THRESH - 50, 0);
 }
 
 /*
@@ -133,101 +105,97 @@ bool LDRBelowDarkRoomThreshold() {
 * This indicates the room is light enough to turn on the backlight when the LCD is in Auto mode.
 */
 bool LDRAboveLightRoomThreshold() {
-  return analogRead(LDR_PIN) >= min(LDR_DARK_ROOM_THRESH + 250, 4095);
+  return analogRead(LDR_PIN) >= min(LDR_DARK_ROOM_THRESH + 50, 4095);
 }
 
-/*
-* True if the LDR is reading a value below the swipe threshold.
-* Updated every minute.
-*/
-bool LDRBelowSwipeThreshold() {
-  return analogRead(LDR_PIN) <= _ldrSwipeThreshold;
-}
+// /*
+// * Continuously checks for LDR being swiped by the user and calls LDRSwiped if so.
+// * Debounced.
+// */
+// void ProcessSwiping() {
+//   static const int delayBeforeReturn = 2500;                        // How long to remain in the ldr-swipe cycling view after no ldr swipe change before returning back to the stat display screen.
+//   static const int debounceDelay = 50;                              // How long the LDR must read a consistant high or low value to be considered stable input.
+//   static const int minSwipeDarknessTime = 150;                      // The minimum amount of time (ms) the LDR must be in dark state to consider a thumb swipe as having stated.
+//   static const int maxSwipeDarknessTime = 2500;                     // After this time (ms) it is unlikely to be a thumb swipe and more likely to be the lights turning off.
 
-/*
-* Continuously checks for LDR being swiped by the user and calls LDRSwiped if so.
-* Debounced.
-*/
-void ProcessSwiping() {
-  static const int delayBeforeReturn = 2500;                        // How long to remain in the ldr-swipe cycling view after no ldr swipe change before returning back to the stat display screen.
-  static const int debounceDelay = 50;                              // How long the LDR must read a consistant high or low value to be considered stable input.
-  static const int minSwipeDarknessTime = 150;                      // The minimum amount of time (ms) the LDR must be in dark state to consider a thumb swipe as having stated.
-  static const int maxSwipeDarknessTime = 2500;                     // After this time (ms) it is unlikely to be a thumb swipe and more likely to be the lights turning off.
+//   static elapsedMillis debounceTimer;                               // Timer for debouncing LDR readings.
+//   static bool previouslyBelowLimit;                                 // LDR reading from the previous invocation. Used for debouncing, not for tracking complete state changes.
 
-  static elapsedMillis debounceTimer;                               // Timer for debouncing LDR readings.
-  static bool previouslyBelowLimit;                                 // LDR reading from the previous invocation. Used for debouncing, not for tracking complete state changes.
+//   static elapsedMillis darkTimer;                                   // Timer for tracking darkness duration.
+//   static bool previouslyInDarkness = false;                         // Tracks if LDR has been in stable darkness. Not to be confused with previouslyBelowLimit.
 
-  static elapsedMillis darkTimer;                                   // Timer for tracking darkness duration.
-  static bool previouslyInDarkness = false;                         // Tracks if LDR has been in stable darkness. Not to be confused with previouslyBelowLimit.
+//   bool ldrSwipeActioned = false;                                    // Whether the action associated with an LDR swipe occured in this invocation. If so, post-swipe action steps will occur after the "delayBeforeReturn" timout.
 
-  bool ldrSwipeActioned = false;                                    // Whether the action associated with an LDR swipe occured in this invocation. If so, post-swipe action steps will occur after the "delayBeforeReturn" timout.
+//   while (true) {
+//     bool belowSwipeThreshold = LDRBelowSwipeThreshold();
+//     DEBUG_SERIAL.println(belowSwipeThreshold);
 
-  while (true) {
-    bool belowSwipeThreshold = LDRBelowSwipeThreshold();
+//     if (belowSwipeThreshold != previouslyBelowLimit) {              // Debounce the LDR input.
+//       DEBUG_SERIAL.print("LDR state change detected. Now: ");
+//       DEBUG_SERIAL.print(analogRead(LDR_PIN));
+//       DEBUG_SERIAL.print(" with a threshold of: ");
+//       DEBUG_SERIAL.println(_ldrSwipeThreshold);
+//       debounceTimer = 0;
+//     }
 
-    if (belowSwipeThreshold != previouslyBelowLimit) {              // Debounce the LDR input.
-      DEBUG_SERIAL.print("LDR state change detected. Now: ");
-      DEBUG_SERIAL.println(analogRead(LDR_PIN));
-      debounceTimer = 0;
-    }
+//     if (debounceTimer > debounceDelay) {                            // Readings have stabilized.
+//       if (belowSwipeThreshold && !previouslyInDarkness) {           // Moving from light to dark.
+//         DEBUG_SERIAL.println("Moving from light state to dark state");
+//         previouslyInDarkness = true;                                // Have moved into a dark state.
+//         darkTimer = 0;                                              // Begin tracking how long the unit has been in darkness.
+//       }
 
-    if (debounceTimer > debounceDelay) {                            // Readings have stabilized.
-      if (belowSwipeThreshold && !previouslyInDarkness) {           // Moving from light to dark.
-        DEBUG_SERIAL.println("Moving from light state to dark state");
-        previouslyInDarkness = true;                                // Have moved into a dark state.
-        darkTimer = 0;                                              // Begin tracking how long the unit has been in darkness.
-      }
+//       if (!belowSwipeThreshold && previouslyInDarkness) {           // Moving from dark to light.
+//         DEBUG_SERIAL.println("Moving from dark state to light state");
+//         previouslyInDarkness = false;                               // Reset for next loop.
+//         if (darkTimer >= minSwipeDarknessTime && darkTimer <= maxSwipeDarknessTime) {
+//           DEBUG_SERIAL.println("Duration lasted length of thumb swipe");
+//           LDRSwiped();                                              // Between 150ms and 3000ms, likely a thumb swipe.
+//           ldrSwipeActioned = true;
+//         }
+//       }
+//     }
 
-      if (!belowSwipeThreshold && previouslyInDarkness) {           // Moving from dark to light.
-        DEBUG_SERIAL.println("Moving from dark state to light state");
-        previouslyInDarkness = false;                               // Reset for next loop.
-        if (darkTimer >= minSwipeDarknessTime && darkTimer <= maxSwipeDarknessTime) {
-          DEBUG_SERIAL.println("Duration lasted length of thumb swipe");
-          LDRSwiped();                                              // Between 150ms and 3000ms, likely a thumb swipe.
-          ldrSwipeActioned = true;
-        }
-      }
-    }
+//     previouslyBelowLimit = belowSwipeThreshold;                     // Update value for next loop debouncing.
+//     delay(50);
 
-    previouslyBelowLimit = belowSwipeThreshold;                     // Update value for next loop debouncing.
+//     if (!ldrSwipeActioned) {                                        // If no LDR swipe was actioned, return immediately, this essentially prevents any looping from taking place during 99% of invocations.
+//       return;
+//     }
 
-    if (!ldrSwipeActioned) {                                        // If no LDR swipe was actioned, return immediately, this essentially prevents any looping from taking place during 99% of invocations.
-      return;
-    }
+//     if (ldrSwipeActioned && debounceTimer > delayBeforeReturn) {    // Post LDR swipe actions that should be performed after a timeout.
+//       LDRPostSwipeTimoutElapsed();
+//       return;
+//     }
+//   }
+// }
 
-    if (ldrSwipeActioned && debounceTimer > delayBeforeReturn) {    // Post LDR swipe actions that should be performed after a timeout.
-      LDRPostSwipeTimoutElapsed();
-      return;
-    }
-  }
-}
+// /*
+// * Called when a users thumb swipe across the LDR is detected.
+// * Thumb swipe should put the LDR into a dark state for between 200 and 3000ms.
+// */
+// void LDRSwiped() {
+//   DEBUG_SERIAL.println("LDR swipe action commencing");
+//   _selectedValueIndex++;                          // Increment the value to be shown. Wrap around if moved out of range.
+//   if (_selectedValueIndex >= API_VALUE_COUNT) {
+//     _selectedValueIndex = 0;
+//   }
 
-/*
-* Called when a users thumb swipe across the LDR is detected.
-* Thumb swipe should put the LDR into a dark state for between 200 and 3000ms.
-*/
-void LDRSwiped() {
-  DEBUG_SERIAL.println("LDR swipe action commencing");
-  _selectedValueIndex++;                          // Increment the value to be shown. Wrap around if moved out of range.
-  if (_selectedValueIndex >= API_VALUE_COUNT) {
-    _selectedValueIndex = 0;
-  }
+//   DEBUG_SERIAL.print("Selected value index now: ");
+//   DEBUG_SERIAL.println(_selectedValueIndex);
 
-  DEBUG_SERIAL.print("Selected value index now: ");
-  DEBUG_SERIAL.println(_selectedValueIndex);
+//   WriteToLCD(                                     // Display the summary for the currently selected option.
+//     _valueSelectionSummary[_selectedValueIndex][0],
+//     _valueSelectionSummary[_selectedValueIndex][1]
+//   );
+// }
 
-  WriteToLCD(                                     // Display the summary for the currently selected option.
-    _valueSelectionSummary[_selectedValueIndex][0],
-    _valueSelectionSummary[_selectedValueIndex][1]
-  );
-}
-
-/*
-* Called when the LDR was swiped, the action completed and the post call timeout has elapsed.
-* Configured to save the new setting to EEPROM and render the current stat.
-*/
-void LDRPostSwipeTimoutElapsed() {
-  SaveConfigToEEPROM();
-  delay(2000);
-  ProcessDisplayValueUpdate(true);    // Call display update with override value to clear the button message from the screen and display the stat again.
-}
+// /*
+// * Called when the LDR was swiped, the action completed and the post call timeout has elapsed.
+// * Configured to save the new setting to EEPROM and render the current stat.
+// */
+// void LDRPostSwipeTimoutElapsed() {
+//   SaveConfigToEEPROM();
+//   delay(2000);
+//   ProcessDisplayValueUpdate(true);    // Call display update with override value to clear the button message from the screen and display the stat again.
+// }

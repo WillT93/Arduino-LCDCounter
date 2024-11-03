@@ -27,7 +27,7 @@
 
 // LDR
 #define LDR_PIN               32    // The input pin the LDR is connected to, must be capable of analog input reading.
-#define LDR_DARK_ROOM_THRESH  1000  // The value the LDR must be 250pt below to turn the backlight off and 250pt above to turn the backlight on.
+#define LDR_DARK_ROOM_THRESH  200   // The value the LDR must be 50 below to turn the backlight off and 50 above to turn the backlight on.
 
 // WiFi / API
 #define WIFI_RECONN_TIMEOUT   10    // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
@@ -42,6 +42,5 @@ extern bool _currentValueUpdated[API_VALUE_COUNT];                  // Whether t
 extern int _selectedValueIndex;                                     // The statistic chosen to be displayed. API returns multiple, pipe delimited ints. The one selected here is what is rendered on the display.
 extern DisplayDimmingMode _selectedDisplayMode;                     // How the display backlight should behave when the device is in a dark room.
 extern bool _lcdBacklightOn;                                        // Whether the LCD backlight is on.
-extern int _ldrSwipeThreshold;                                      // The nominal value of the LDR with 15% removed. Updated every minute. When the LDR is below this value for a brief period, it is considered to be a thumb swipe.
 
 #endif
