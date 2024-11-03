@@ -64,6 +64,10 @@ void UpdateValueFromAPI() {
       for (int i = 0; i < API_VALUE_COUNT; i++) {
         strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);             // Triggers an error on the LCD.
       }
+      https.end();
+      _lcd.setCursor(15, 1);
+      _lcd.print(" ");
+      return;
     }
 
     char* token = strtok(responseBuffer, "|");                              // Gets the first token (the first value in the string prior to the first '|' operator).
