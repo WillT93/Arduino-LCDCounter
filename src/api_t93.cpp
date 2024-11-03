@@ -40,7 +40,6 @@ void UpdateValueFromAPI() {
   _lcd.print(".");
 
   static char responseBuffer[RESPONSE_BUFFFER_SIZE];                            // For manipulating the response from the API.
-  static char previousValue[API_VALUE_COUNT][MAX_VALUE_LENGTH] = {"", "", ""};  // Holds the values that were previously in the _currentValues array for comparison.
 
   WiFiClientSecure client;
   HTTPClient https;
@@ -61,8 +60,9 @@ void UpdateValueFromAPI() {
 
     if (!validResponse) {
       DEBUG_SERIAL.println("Invalid API response");
+      WriteToLCD("Invalid API", "response");
       for (int i = 0; i < API_VALUE_COUNT; i++) {
-        strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);
+        strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);             // Triggers an error on the LCD.
       }
     }
 
@@ -70,13 +70,10 @@ void UpdateValueFromAPI() {
     int index = 0;
 
     while (token != nullptr && index < API_VALUE_COUNT) {                   // While there are values to be read (ValidatePayloadFormat() should have handled this) and haven't read all the values expected...
-      if (strcmp(previousValue[index], token) != 0) {                       // If the value differs from what it was previously...
+      if (strcmp(_currentValue[index], token) != 0) {                       // If the value differs from what we currently have stored...
         _currentValueUpdated[index] = true;                                 // Mark as updated.
         strncpy(_currentValue[index], token, MAX_VALUE_LENGTH);             // Copy the new value into the _currentValue array for eventual displaying.
         _currentValue[index][MAX_VALUE_LENGTH - 1] = '\0';                  // Ensure null termination
-
-        strncpy(previousValue[index], _currentValue[index], 16);            // Update the previous value to the current value.
-        previousValue[index][MAX_VALUE_LENGTH - 1] = '\0';                  // Ensure null termination.
 
         DEBUG_SERIAL.print("Got new value: ");
         DEBUG_SERIAL.print(token);
@@ -98,6 +95,7 @@ void UpdateValueFromAPI() {
   }
   else {
     DEBUG_SERIAL.println("Unable to contact API");                          // In the event WiFi is connected but the API is unreachable
+    WriteToLCD("Unable to", "contact API");
     for (int i = 0; i < API_VALUE_COUNT; i++) {
       strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);
     }

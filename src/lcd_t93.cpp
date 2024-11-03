@@ -43,11 +43,7 @@ void InitializeLCD() {
 }
 
 void ProcessDisplayValueUpdate(bool override) {
-  if (strcmp(_currentValue[_selectedValueIndex], "Unknown") == 0) {
-    DEBUG_SERIAL.println("Invalid response returned from API");
-    WriteToLCD("Invalid API", "response");
-  }
-  else if (_currentValueUpdated[_selectedValueIndex] || override) {
+  if (_currentValueUpdated[_selectedValueIndex] || override) {
     if (!override) {
       DEBUG_SERIAL.println("Updated value found for writing to LCD");
       WriteToLCD(_valueLabel[_selectedValueIndex], _currentValue[_selectedValueIndex], true);
