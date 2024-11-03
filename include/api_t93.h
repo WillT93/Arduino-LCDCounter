@@ -5,7 +5,6 @@
 
 void ProcessAPIPolling();
 void UpdateValueFromAPI();
-void ReadResponseStream(HTTPClient&, char*, int);
 void RemoveAsteriskNotation(char*);
 bool ValidatePayloadFormat(char*);
 

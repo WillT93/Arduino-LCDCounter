@@ -39,10 +39,7 @@ void UpdateValueFromAPI() {
   _lcd.setCursor(15, 1); // Little dot in bottom right section shows API being polled.
   _lcd.print(".");
 
-  static char responseBuffer[RESPONSE_BUFFFER_SIZE];                            // For manipulating the response from the API.
-
-  WiFiClientSecure client;
-  HTTPClient https;
+  static char responseBuffer[RESPONSE_BUFFFER_SIZE];                        // For manipulating the response from the API.
 
   client.setInsecure();                                                     // The endpoint being hit is an https endpoint, but it doesn't require certs etc.
   https.begin(client, SECRET_API_ENDPOINT);
@@ -54,7 +51,25 @@ void UpdateValueFromAPI() {
   DEBUG_SERIAL.println(httpResponseCode);
 
   if (httpResponseCode > 0) {
-    ReadResponseStream(https, responseBuffer, RESPONSE_BUFFFER_SIZE);       // Reads the API response into the responseBuffer char array.
+    String response = https.getString();                                    // Pulls the response out, unfortunately uses String, but using .getStream() was proving to be riskier depending on how the API returns the payload, headers, chunking etc.
+
+    if (response.length() >= RESPONSE_BUFFFER_SIZE) {                       // Ensures the response isn't too large to fit in the buffer.
+      DEBUG_SERIAL.println("Response too large for buffer!");
+      WriteToLCD("API response", "too large");
+      for (int i = 0; i < API_VALUE_COUNT; i++) {
+        strncpy(_currentValue[i], "Unknown", MAX_VALUE_LENGTH);             // Triggers an error on the LCD.
+      }
+      response.clear();
+      https.end();
+      _lcd.setCursor(15, 1);
+      _lcd.print(" ");
+      return;
+    }
+
+    strncpy(responseBuffer, response.c_str(), RESPONSE_BUFFFER_SIZE - 1);   // Copy string content to responseBuffer. Doing this means we can immediately dispose of the String variable.
+    responseBuffer[RESPONSE_BUFFFER_SIZE - 1] = '\0';                       // Ensure null termination
+    response.clear();
+    
     RemoveAsteriskNotation(responseBuffer);                                 // Removes the * used to inform the 7-seg display which value to display. Unused on LCD units.
     bool validResponse = ValidatePayloadFormat(responseBuffer);             // Ensures there are at least as many values as API_VALUE_COUNT.
 
@@ -109,63 +124,6 @@ void UpdateValueFromAPI() {
 
   _lcd.setCursor(15, 1);
   _lcd.print(" ");
-}
-
-/*
-* Reads the response stream from the API into a character buffer and then terminates it.
-*/
-void ReadResponseStream(HTTPClient& https, char* buffer, int bufferSize) {
-  DEBUG_SERIAL.println("Reading response stream from API");
-  WiFiClient* stream = https.getStreamPtr();                    // Gets the pointer to the stream of contents waiting to be read.
-
-  int bytesRead = 0;                                            // Number of information bytes read from the stream.
-  char chunkSizeBuffer[10];                                     // Small buffer to store chunk size in hex.
-  int chunkSize = 0;                                            // HTTP responses are broken into chunks. This is needed due to the way stream->read() handles them. IDK.
-
-  while (stream->connected() && stream->available()) {          // While there is data available in the stream...
-    int chunkSizeIndex = 0;
-    while (true) {                                              // Read the chunk size line character by character until you hit '\n'.
-        char c = stream->read();
-        if (c == '\n') break;                                   // Stop at the end of the line.
-        if (c == '\r') {                                        // Ignore '\r' characters.
-          continue;
-        }                                             
-        chunkSizeBuffer[chunkSizeIndex] = c;
-        chunkSizeIndex++;
-    }
-    chunkSizeBuffer[chunkSizeIndex] = '\0';                     // Null-terminate the chunk size string.
-    
-    chunkSize = strtol(chunkSizeBuffer, nullptr, 16);           // Convert hex string to integer for the chunk size.
-    if (chunkSize == 0) {                                       // Check if this is the final chunk (size 0 means end of response).
-      break;
-    }
-
-    DEBUG_SERIAL.print("Byte-by-byte contents (excl chunk data): ");
-    for (int i = 0; i < chunkSize; i++) {                       // Read exactly `chunkSize` bytes into the buffer.
-      if (bytesRead == bufferSize - 1) {                        // If end of buffer is reached...
-        DEBUG_SERIAL.println("resonseBuffer exhausted prior to payload completion. Possibly this is fine id only using a subset of the first few values in the response.");
-        break;
-      }
-
-      if (stream->available()) {                                // Reading of actual payload information.
-        char character = stream->read();
-        DEBUG_SERIAL.print(character);
-        buffer[bytesRead] = character;                          // Read each byte into the buffer.
-        bytesRead++;
-      }
-    }
-    DEBUG_SERIAL.println();
-
-    if (stream->available()) stream->read();                    // Skip the trailing newline after each chunk
-  }
-  DEBUG_SERIAL.print("Read ");
-  DEBUG_SERIAL.print(bytesRead);
-  DEBUG_SERIAL.println(" bytes into responseBuffer");
-
-  DEBUG_SERIAL.print("responseBuffer contains: ");
-  DEBUG_SERIAL.println(buffer);
-  
-  buffer[bytesRead] = '\0';                                     // Ensure null termination of the string.
 }
 
 /*
