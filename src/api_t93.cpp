@@ -41,6 +41,9 @@ void UpdateValueFromAPI() {
 
   static char responseBuffer[RESPONSE_BUFFFER_SIZE];                        // For manipulating the response from the API.
 
+  WiFiClientSecure client;
+  HTTPClient https;
+  
   client.setInsecure();                                                     // The endpoint being hit is an https endpoint, but it doesn't require certs etc.
   https.begin(client, SECRET_API_ENDPOINT);
   https.addHeader("X-API-KEY", SECRET_API_KEY);                             // Using X-API-KEY header as auth function on endpoint.

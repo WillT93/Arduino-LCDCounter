@@ -10,4 +10,4 @@ ssl_context.load_cert_chain('./cert.pem', keyfile='./key.pem')
 
 @app.get("/api/test", response_class=PlainTextResponse)
 async def getNumber():
-    return "*123|456|789"
+    return "123|*456|789"

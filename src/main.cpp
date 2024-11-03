@@ -1,5 +1,3 @@
-// TODO: Locate memory leak
-
 #include <Arduino.h>
 #include <elapsedMillis.h>
 
