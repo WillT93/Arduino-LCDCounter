@@ -19,12 +19,13 @@ void ProcessRestart();
 
 void setup() {
   if (EEPROM_INIT) {
-    InitializeEEPROM();
+    ClearEEPROM();
     return;
   }
 
   DEBUG_SERIAL.begin(9600);
 
+  InitializeEEPROM();
   LoadConfigFromEEPROM();
   InitializeButtons();
   InitializeLDR();

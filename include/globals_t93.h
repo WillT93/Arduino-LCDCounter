@@ -8,8 +8,8 @@
 #include "enums_t93.h"
 
 // Debugging configuration
-#define DEBUG                 true      // Optional printing of debug messages to serial.
-#define EEPROM_INIT           false     // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
+#define DEBUG                 true     // Optional printing of debug messages to serial.
+#define EEPROM_INIT           false    // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
 
 // Helper methods
 #define LEN(arr)              ((int) (sizeof (arr) / sizeof (arr)[0]))
@@ -33,10 +33,11 @@
 #define WIFI_RECONN_TIMEOUT   10    // How long to attempt WiFi connection with saved credentials before invoking portal. Also how often it will wait between re-attempts when portal is running.
 #define POLL_INTERVAL_SECONDS 30    // How often to poll the endpoint.
 #define API_VALUE_COUNT       3     // The number of values this version of code expects from the API, values in excess will be discarded. There should be a _valueLabel entry for each of these in secrets file.
-#define RESPONSE_BUFFER_SIZE 512   // The size of the buffer to read the API response string into. Must be at least as large as the length of the returned payload.
+#define RESPONSE_BUFFER_SIZE 512    // The size of the buffer to read the API response string into. Must be at least as large as the length of the returned payload.
 #define MAX_VALUE_LENGTH      16    // The maximum length of each return value including termination character. Note only allowing up to 15 chars (plus termination) because the 16th column is used for the folling indicator.
 
 #define RESTART_INTERVAL      86,400,000  // The number of milliseconds in 24 hours, used for periodic reboots to keep memory fresh.
+#define EEPROM_SIZE           10    // The size of the EEPROM to save information in. 10 is overkill as currently there are only two ints in play.
 
 extern hd44780_I2Cexp _lcd;
 extern char _currentValue[API_VALUE_COUNT][MAX_VALUE_LENGTH];       // The current values available to be rendered on the display. One for each API value. Length (incl termination char) is up to the number of columns on the LCD as the last column is reserved for API polling indicator.
