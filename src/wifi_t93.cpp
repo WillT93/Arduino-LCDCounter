@@ -23,8 +23,8 @@ void InitializeWiFi() {
   // Attempt connection using stored WiFi configuration.
   // This allows us to resolve connection drops without invoking WiFiManager.
   WiFi.reconnect();
-  elapsedMillis autoConnectMillis = 0;
-  while (autoConnectMillis < WIFI_RECONN_TIMEOUT * 1000) {
+  elapsedMillis timer = 0;
+  while (timer < WIFI_RECONN_TIMEOUT * 1000) {
     if (IsWiFiConnected()) {
       DEBUG_SERIAL.println("WiFi connected!");
       WriteToLCD("WiFi connected!");
@@ -45,36 +45,55 @@ void InitializeWiFi() {
   // Generate an instance of WiFi Manager to build the portal and handle reconnect.
   WiFiManager wifiManager;
   wifiManager.setConfigPortalBlocking(false);
-  wifiManager.autoConnect("ESP-CX-CTR", SECRET_WIFI_PASSWORD); // This will actually attempt reconnection one more time. It's possible to use .startConfigPortal() but the non-blocking code is a lot more complex.
+  wifiManager.setConfigPortalTimeout(60);
+  wifiManager.setConfigPortalTimeoutCallback(PortalTimeoutCallback);
+  wifiManager.setAPClientCheck(true);
+  wifiManager.startConfigPortal("ESP-CX-CTR", SECRET_WIFI_PASSWORD);
 
-  char passwordText[LCD_COLUMNS + 1];                          // Create a char[] to build password text. C does not support string concatenation for string literals directly.
-  sprintf(passwordText, "Pass: %s", SECRET_WIFI_PASSWORD);     // Build the text to be displayed on the LCD and store in the char[].
+  char passwordText[LCD_COLUMNS + 1];                           // Create a char[] to build password text. C does not support string concatenation for string literals directly.
+  sprintf(passwordText, "Pass: %s", SECRET_WIFI_PASSWORD);      // Build the text to be displayed on the LCD and store in the char[].
   
   // Non-blocking WiFi Manager instance to allow us to refresh the display while the portal is active.
-  autoConnectMillis = 0;
-  while (WiFi.status() != WL_CONNECTED) {
+  timer = 0;
+  int messageCount = 0;
+  while (!IsWiFiConnected()) {
     wifiManager.process();
 
-    WriteToLCD("Connect to the", "following WiFi:");
-    delay(2000);
-    WriteToLCD("Name: ESP-CX-CTR", passwordText);
-    delay(5000);
-
-    WriteToLCD("Then visit the", "following site:");
-    delay(2000);
-    WriteToLCD("URL:", "192.168.4.1");
-    delay(4000);
-
-    // Periodically re-attempt connection to the saved WiFi... Just in case.
-    if (autoConnectMillis > WIFI_RECONN_TIMEOUT * 1000) {
-      WiFi.reconnect();
-      autoConnectMillis = 0;
+    // Non-blocking LCD printing. Allows WifiManager to process quickly, only updating the LCD every 2-6-2-6 seconds.
+    if (timer > 16000) {
+      timer = 0;
+      messageCount = 0;
+    }
+    else if (timer > 10000 && messageCount == 3) {
+      WriteToLCD("URL:", "192.168.4.1");
+      messageCount++;
+    }
+    else if (timer > 8000 && messageCount == 2) {
+      WriteToLCD("Then visit the", "following site:");
+      messageCount++;
+    }
+    else if (timer > 2000 && messageCount == 1) {
+      WriteToLCD("Name: ESP-CX-CTR", passwordText);
+      messageCount++;
+    }
+    else if (messageCount == 0) {
+      WriteToLCD("Connect to the", "following WiFi:");
+      messageCount++;
     }
   }
 
   DEBUG_SERIAL.println("WiFi connected!");
   WriteToLCD("WiFi connected!");
   DEBUG_SERIAL.println("WiFi initialized");
+}
+
+/*
+* Called when the ESP cannot connect to saved WiFi, the portal timed out and no clients were connected to the AP.
+*/
+void PortalTimeoutCallback() {
+  DEBUG_SERIAL.println("WiFi config portal timeout - rebooting ESP");
+  WriteToLCD("WiFi timeout", "rebooting...");
+  ESP.restart();
 }
 
 /*

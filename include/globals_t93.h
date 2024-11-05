@@ -8,12 +8,17 @@
 #include "enums_t93.h"
 
 // Debugging configuration
-#define DEBUG                 true     // Optional printing of debug messages to serial.
-#define EEPROM_INIT           false    // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
+#define DEBUG                 true    // Optional printing of debug messages to serial.
 
 // Helper methods
 #define LEN(arr)              ((int) (sizeof (arr) / sizeof (arr)[0]))
 #define DEBUG_SERIAL          if (DEBUG) Serial
+
+// EEPROM
+#define EEPROM_INIT           false // When set to true, EEPROM is written over with 0's. Perform once per ESP32 unit.
+#define EEPROM_SIZE           100   // The size of the EEPROM to save information in. 100 is overkill as currently there are only two ints in play.
+#define SV_INDEX              10    // The location in EEPROM of the _selectedValueIndex variable.
+#define DM_INDEX              20    // The location in EEPROM of the _selectedDisplayMode variable.
 
 // LCD
 #define ANIM_FRAME_COUNT      8     // The number of frames in the LCD animation sequence.
@@ -37,7 +42,6 @@
 #define MAX_VALUE_LENGTH      16    // The maximum length of each return value including termination character. Note only allowing up to 15 chars (plus termination) because the 16th column is used for the folling indicator.
 
 #define RESTART_INTERVAL      86,400,000  // The number of milliseconds in 24 hours, used for periodic reboots to keep memory fresh.
-#define EEPROM_SIZE           10    // The size of the EEPROM to save information in. 10 is overkill as currently there are only two ints in play.
 
 extern hd44780_I2Cexp _lcd;
 extern char _currentValue[API_VALUE_COUNT][MAX_VALUE_LENGTH];       // The current values available to be rendered on the display. One for each API value. Length (incl termination char) is up to the number of columns on the LCD as the last column is reserved for API polling indicator.

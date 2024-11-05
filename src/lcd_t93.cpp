@@ -39,7 +39,7 @@ void InitializeLCD() {
     _lcd.createChar(i, animationCustomChars[i]);
   }
   
-  DEBUG_SERIAL.println("LCD initialized!");
+  DEBUG_SERIAL.println("LCD initialized");
 }
 
 void ProcessDisplayValueUpdate(bool override) {
