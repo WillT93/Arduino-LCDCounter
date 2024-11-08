@@ -1,0 +1,1 @@
+This directory contains a PDF schematic of the circuit, two JSON files which can be uploaded and edited in EasyEDA, and a Gerber zip file which can be sent off to JLCPCB or PCBWay to have the PCBs printed.
